@@ -36,3 +36,8 @@ A paid-social uplift (spend × 2.5) ran in 12 German regions for 8 weeks (`test_
 `journey_id`, `country`, `start_date`, `path_length`, `first_touch`, `last_touch`, `mobile`, `new_customer`, touch counts per channel (`n_display`, `n_paid_search`, `n_paid_social`, `n_email`, `n_affiliate`, `n_organic`), `converted`, `order_value_eur`, `path` (channels in order, separated by ` > `).
 
 `attribution/journeys_long.csv` holds the same journeys in long format, one row per touchpoint.
+
+## `data/legacy/`: warm-up datasets for Session 1
+
+- `Video_Games_Sales.csv`: sales of 16 719 video games in North America, Europe, Japan and the rest of the world (millions of units), with genre, platform, critic and user scores. Public dataset from Kaggle ("Video Game Sales with Ratings", based on VGChartz and Metacritic).
+- `chocolate_dataset.xlsx`: 68 weeks of sales, prices, features and displays for four chocolate brands (Lab 1, exercise 4).

@@ -9,6 +9,9 @@ This repository holds what you need on your laptop for the course: the synthetic
 | Path | What it is |
 |---|---|
 | `data/` | Alpenglow, a fictional premium chocolate brand in six European markets: weekly sales and media spend, a geo-lift experiment and customer journeys. See [`data/README.md`](data/README.md) |
+| `data/legacy/` | Two warm-up datasets for Session 1: video game sales and a four-brand chocolate panel |
+| `sessions/01-foundations/lab.qmd` | Lab 1: Positron and GitHub Desktop tour, video game warm-up, price elasticities for six countries |
+| `assets/mma.py` | Helper functions the labs import (data loading, seasonality terms, error measures) |
 | `requirements.txt` | The Python packages and versions we all use |
 | `setup/check_setup.py` | Checks Python, the packages, Quarto and Git, and prints `ready` |
 | `test_stack.qmd` | Runs polars, plotnine and statsmodels on the data and renders the result with Quarto |
@@ -30,3 +33,7 @@ This repository holds what you need on your laptop for the course: the synthetic
 ## Getting updates
 
 Before every session: GitHub Desktop → *Fetch origin* → *Pull origin*. Keep your own work in your own files (or in your group's repository), so pulling never overwrites it.
+
+## Labs
+
+Open a lab in Positron (for Session 1: `sessions/01-foundations/lab.qmd`), select the project's `.venv` and run the cells top to bottom with Ctrl/Cmd + Enter, or press *Preview* to render the whole document. New labs appear here before each session: pull first.
