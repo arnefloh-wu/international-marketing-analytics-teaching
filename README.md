@@ -15,7 +15,7 @@ This repository holds what you need on your laptop for the course: the synthetic
 | `case-study/` | The group case study: brief and assessment criteria (`brief.pdf`, `brief.qmd`) and the report template `report.qmd`. Due 30 November 2026, 23:59 |
 | `requirements.txt` | The Python packages and versions we all use |
 | `setup/check_setup.py` | Checks Python, the packages, Quarto and Git, and prints `ready` |
-| `test_stack.qmd` | Runs polars, plotnine and statsmodels on the data and renders the result with Quarto |
+| `test_stack.qmd` | Single-file stack test: installs and loads polars, plotnine, great_tables and statsmodels, reads the data from GitHub and renders a table, a chart and a regression |
 
 ## Get it onto your laptop
 
@@ -29,7 +29,7 @@ This repository holds what you need on your laptop for the course: the synthetic
    ```
 
    It ends with `ready`.
-5. **Test**: open `test_stack.qmd` and press *Preview* (Ctrl/Cmd + Shift + K). A short report with a table, a chart and regression results appears.
+5. **Test**: open `test_stack.qmd`, run its first cell once (Ctrl/Cmd + Enter), then press *Preview* (Ctrl/Cmd + Shift + K). A short report with a table, a chart and regression results appears.
 
 ## Getting updates
 
