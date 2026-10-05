@@ -37,6 +37,15 @@ A paid-social uplift (spend × 2.5) ran in 12 German regions for 8 weeks (`test_
 
 `attribution/journeys_long.csv` holds the same journeys in long format, one row per touchpoint.
 
+## `data/case/`: group case study (Alpenglow web shop and Alpenglow Club)
+
+Data for the group case study. Brief: `case-study/brief.pdf`.
+
+- `alpenglow_shop_weekly.csv`: 468 rows (AT, DE, CH × 156 weeks, 2023-01-02 … 2025-12-22): `orders`, `revenue_eur_k`, `avg_price_eur`, `discount_pct`, `free_shipping`, `branded_search_index`, `temperature_c`, holiday dummies (`xmas`, `black_friday`, `valentine`, `easter`, `mothers_day`) and spend in four channels (`spend_tv_k`, `spend_online_video_k`, `spend_paid_search_k`, `spend_paid_social_k`; no TV in CH).
+- `alpenglow_club_customers.csv`: 6 000 subscribers with plan, tenure, age, acquisition channel, signup discount, price, late deliveries, complaints, satisfaction, email open rate, app use and the outcome `churned_6m`.
+- `plan_q1_2026.csv`: 39 rows (3 countries × 13 weeks, 2025-12-29 … 2026-03-23): the drivers known in advance (prices, discounts, free shipping, holidays, media plan) and `temperature_normal_c`, for the Q1 2026 forecast.
+
+
 ## `data/legacy/`: warm-up datasets for Session 1
 
 - `Video_Games_Sales.csv`: sales of 16 719 video games in North America, Europe, Japan and the rest of the world (millions of units), with genre, platform, critic and user scores. Public dataset from Kaggle ("Video Game Sales with Ratings", based on VGChartz and Metacritic).

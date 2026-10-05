@@ -1,0 +1,267 @@
+---
+title: "Group case study: Alpenglow's web shop"
+subtitle: "Assignment brief and assessment criteria · International Marketing Analytics · WU Vienna · WT 2026/27"
+author: "Dr Arne Floh"
+date: 2026-10-06
+format:
+  html:
+    toc: true
+    toc-depth: 2
+    number-sections: true
+    embed-resources: true
+---
+
+::: {.callout-important}
+## The assignment in brief
+
+| | |
+|---|---|
+| **Groups** | at most 4 students |
+| **Weight** | 30 % of the final grade |
+| **Submit** | `report.qmd` **and** the rendered `report.html`, one upload per group on Canvas |
+| **Deadline** | **Monday 30 November 2026, 23:59 (Vienna time)** |
+| **Tools** | Python with **polars**, **plotnine**, **great_tables** and **statsmodels** (plus numpy, which comes with them). No other packages are needed. |
+| **Data** | `data/case/` in the course repository: weekly web-shop data for Austria, Germany and Switzerland, a file of Alpenglow Club subscribers, and the Q1 2026 plan |
+:::
+
+# The situation
+
+Alpenglow, the Vienna chocolate brand you know from the labs, sells online through its own web shop in **Austria, Germany and Switzerland**. Since 2023 it has also run the **Alpenglow Club**, a subscription that sends a box of chocolate every month or every quarter.
+
+The Head of E-commerce has four questions for your team, one for each block of the course:
+
+1. **What drives weekly orders?** (Session 1)
+2. **How price-sensitive are customers in each country, and how does advertising work?** In particular: does TV work directly, or by making people search for Alpenglow? And is paid social worth more in weeks with free shipping? (Session 2)
+3. **Which Club subscribers are about to cancel, and who should get a retention offer?** (Session 3)
+4. **How many orders should Germany plan for in the first quarter of 2026?** (Session 4)
+
+Your report answers these questions for a manager who reads the executive summary and the figures, and for an analyst who checks your code. Every number in the report must come from code in `report.qmd`.
+
+# Data
+
+All files are in `data/case/` of the course repository (pull it first). The data are synthetic: they behave like real marketing data, but no real company or customer is behind them.
+
+## `alpenglow_shop_weekly.csv`: 468 rows (3 countries × 156 weeks, 2 Jan 2023 to 22 Dec 2025)
+
+| Column | Meaning |
+|---|---|
+| `week` | Monday of the week |
+| `country` | AT, DE or CH |
+| `orders` | web-shop orders in that week |
+| `revenue_eur_k` | revenue, thousand EUR |
+| `avg_price_eur` | average price paid per box after discounts, EUR |
+| `discount_pct` | voucher discount running that week, % (0 = no discount) |
+| `free_shipping` | 1 if the shop offered free shipping that week |
+| `branded_search_index` | searches for "Alpenglow" (index, 0 to 100) |
+| `temperature_c` | average temperature, °C |
+| `xmas`, `black_friday`, `valentine`, `easter`, `mothers_day` | 1 in the selling weeks before these occasions |
+| `spend_tv_k`, `spend_online_video_k`, `spend_paid_search_k`, `spend_paid_social_k` | media spend, thousand EUR (no TV in Switzerland) |
+
+## `alpenglow_club_customers.csv`: 6 000 subscribers
+
+| Column | Meaning |
+|---|---|
+| `customer_id` | identifier |
+| `country` | AT, DE or CH |
+| `plan` | `monthly` or `quarterly` box |
+| `tenure_months` | months since sign-up |
+| `age` | years |
+| `acquisition_channel` | how the customer found the Club: `paid_search`, `paid_social`, `influencer`, `referral`, `tv_campaign` |
+| `signup_discount` | 1 if the customer joined with a first-box discount |
+| `price_per_box_eur` | price per box, EUR |
+| `late_deliveries_6m` | late deliveries in the last six months |
+| `complaints_6m` | complaints in the last six months |
+| `satisfaction` | last satisfaction score, 1 (low) to 10 (high) |
+| `email_open_rate` | share of newsletters opened, 0 to 1 |
+| `app_user` | 1 if the customer uses the Alpenglow app |
+| `churned_6m` | **outcome**: 1 if the customer cancelled within the following six months |
+
+## `plan_q1_2026.csv`: 39 rows (3 countries × 13 weeks, 29 Dec 2025 to 23 Mar 2026)
+
+The drivers that are known before the quarter starts: planned prices and discounts, free-shipping weeks, holiday flags and the media plan, plus `temperature_normal_c`, the average temperature of that week in 2023 to 2025 (the real temperature is not known in advance). Orders and branded search are not in this file: they are what you forecast. Use it as the future values of the explanatory variables in Part D.
+
+# Set-up for the group
+
+1. One member creates the **group repository** on github.com and invites the others (Settings → Collaborators). Everyone clones it with GitHub Desktop.
+2. Copy `data/case/` and the template `case-study/report.qmd` from the course repository into the group repository, so that `report.qmd` sits at the top level next to the `data/` folder. Keep the paths in the template (`data/case/...`): they must work on every laptop.
+3. Create the project environment in Positron (*Python: Create Environment*, Venv, Python 3.14, tick `requirements.txt`; copy `requirements.txt` from the course repository too).
+4. Work in small commits; pull before you start, push when you stop. Split the parts between members, but every member must be able to explain every part.
+
+One helper you may copy into your report (it is also in the template):
+
+```python
+import numpy as np
+
+def adstock(x, decay, max_lag=10):
+    """Geometric adstock: this week's spend plus a decaying share of past weeks' spend."""
+    w = decay ** np.arange(max_lag + 1)
+    w = w / w.sum()
+    x = np.asarray(x, dtype=float)
+    out = np.zeros_like(x)
+    for lag, wl in enumerate(w):
+        out[lag:] += wl * x[: len(x) - lag]
+    return out
+```
+
+Apply `adstock()` **within each country**, sorted by week (the template shows how). Use polars for all data work, convert with `.to_pandas()` only when you pass data to statsmodels, plotnine for every figure and great_tables for every table in the report.
+
+# Tasks
+
+Number your tables and figures as below (Table A1, Figure B2, ...), so the assessment can find them. "Interpret" means two to four sentences in plain language, with the number and its unit. Every task uses only what we practise in the labs.
+
+## Checking the assumptions
+
+For every regression you check a few basic assumptions, with plots and numbers that statsmodels already gives you. You do not need formal tests beyond these. What matters is that you look, describe what you see in plain words, and say whether it changes how much you trust the results.
+
+| Model | What to check | How |
+|---|---|---|
+| Linear regression (Parts A and B) | the relationship is roughly linear and the spread of the errors is roughly constant | plot residuals against fitted values (`model.fittedvalues`, `model.resid`); look for curves or a funnel |
+| | the errors are roughly normal | histogram of the residuals (`geom_histogram`) |
+| | the errors of neighbouring weeks are not related | Durbin-Watson in `model.summary()`: close to 2 is fine, well below 2 means related errors |
+| | the explanatory variables are not too similar | variance inflation factors (`variance_inflation_factor` from `statsmodels.stats.outliers_influence`); above 10 is a warning |
+| Logistic regression (Part C) | each customer appears once, enough churners, no very similar variables | count rows and unique `customer_id`; at least 10 churners per coefficient; VIF |
+| ARIMA (Part D) | the forecast errors are not related any more | autocorrelation of the residuals (`acf(result.resid)`), and Prob(Q) (Ljung-Box) in `result.summary()`: above 0.05 is fine |
+
+## Part A: What drives weekly orders? (Session 1)
+
+**A1 Data check.** Load both data files with polars (`try_parse_dates=True`). Report the number of rows per country, the first and last week, and the number of missing values. Add `month` (`pl.col("week").dt.month()`) and `t`, a week counter that starts at 0 in each country.
+*Output:* **Table A1**: one row per country with average weekly orders, average price, average branded search index and total media spend per channel in 2025.
+
+**A2 First look.** *Output:* **Figure A1**: weekly orders over time, one panel per country (`facet_wrap`, `scales="free_y"`). **Figure A2**: orders against average price, coloured by whether a discount ran (`discount_pct > 0`). Describe trend, seasonality and holiday peaks in three sentences.
+
+**A3 First regression.** Estimate with statsmodels OLS:
+`orders ~ avg_price_eur + discount_pct + free_shipping + xmas + black_friday + C(country)`.
+*Output:* **Table A2**: coefficients with 95 % confidence intervals. Interpret the coefficients of `avg_price_eur`, `free_shipping` and `xmas`, and explain what the country coefficients compare.
+
+**A4 Model fit.** Report R², adjusted R² and the root mean squared error (RMSE). Add `t` and the other holiday dummies, and compare the fit of the two models in a small table.
+
+**A5 Assumptions.** Check the better model from A4 as described above. *Output:* **Figure A3**: residuals against fitted values; **Figure A4**: histogram of the residuals; the Durbin-Watson value and the VIFs in **Table A3**. What looks fine, what does not, and what could help in Part B?
+
+## Part B: Price, advertising and how it works (Session 2)
+
+From here on the outcome is the log of orders. Unless a task says otherwise, every model in Part B contains these **controls**: `C(country) + C(country):t + C(month) + xmas + black_friday + valentine + easter + mothers_day`.
+
+**B1 Price elasticities.** Estimate `np.log(orders) ~ C(country):np.log(avg_price_eur) + controls`, which gives one price elasticity per country.
+*Output:* **Table B1**: the three elasticities with 95 % confidence intervals. Interpret each as "1 % higher prices change orders by ... %". Do the intervals overlap? What does that mean for pricing in Switzerland compared with Germany?
+
+**B2 A non-linear effect: temperature.** Add `temperature_c + I(temperature_c**2)`. *Output:* **Figure B1**: the predicted effect of temperature on log orders from 0 to 30 °C (compute it from the two coefficients). At which temperature are orders highest, and how much lower are they in a hot week of 28 °C?
+
+**B3 Adstock and saturation.** Create adstocked spend for all four channels with a decay of 0.3. For TV, also try the decays 0.1, 0.5 and 0.7, and keep the one with the highest R². Add the channels to the B2 model as `np.log1p(...)` of the adstocked spend: the logarithm makes each extra euro add less (saturation).
+*Output:* **Table B2**: R² for the four TV decays; **Figure B2**: the estimated effect of weekly paid-search spend on orders, from 0 to the 2025 maximum. Explain carryover and saturation in your own words, with your numbers.
+
+**B4 Moderation.** Does paid social work better in weeks with free shipping? Add `free_shipping` and the interaction `np.log1p(social_adstock):free_shipping`. *Output:* **Table B3** with the paid-social main effect, the free-shipping effect and the interaction. Interpret the interaction for the marketing team.
+
+**B5 Mediation.** For Austria and Germany (Switzerland has no TV), does TV work by making people search for Alpenglow? Estimate three regressions with the B1 controls plus price:
+(1) `np.log(orders) ~ np.log1p(tv_adstock) + controls` (the total effect of TV);
+(2) `branded_search_index ~ np.log1p(tv_adstock) + controls` (does TV raise branded search?);
+(3) `np.log(orders) ~ np.log1p(tv_adstock) + np.log(branded_search_index) + controls` (the direct effect of TV once branded search is in the model).
+*Output:* **Table B4**: the TV coefficient in (1), (2) and (3) and the branded-search coefficient in (3). What happens to the TV coefficient when branded search is added? What should the media team conclude?
+
+**B6 Assumptions.** Check your final Part B model as in A5. *Output:* **Table B5** and **Figure B3** (residuals against fitted values). Compare with A5: what improved, and what problem is left?
+
+## Part C: Which subscribers will cancel? (Session 3)
+
+**C1 Explore.** *Output:* **Table C1**: churn rate by plan and by acquisition channel. **Figure C1**: churn rate by number of late deliveries (0, 1, 2, 3 or more), separately for monthly and quarterly plans.
+
+**C2 Split.** Split the customers into 75 % training and 25 % test data with a fixed seed, for example:
+`club = club.with_columns(pl.Series("u", np.random.default_rng(42).random(club.height)))`, then training = `u < 0.75`. Estimate on the training data only.
+
+**C3 Logistic regression.** Estimate with `smf.logit`:
+`churned_6m ~ tenure_months + C(plan) * late_deliveries_6m + signup_discount + complaints_6m + satisfaction + email_open_rate + app_user + C(acquisition_channel)`.
+*Output:* **Table C2**: odds ratios with 95 % confidence intervals (`np.exp(model.params)` and `np.exp(model.conf_int())`). Interpret the odds ratios of satisfaction and signup discount, and explain in words what the interaction between plan and late deliveries means.
+
+**C4 Model fit.** Report McFadden's pseudo R² (`model.prsquared`). Estimate the model without the interaction and compare the two with AIC. Which one do you keep?
+
+**C5 Assumptions.** Check that each customer appears once, that you have at least 10 churners per coefficient, and the VIFs. *Output:* a short **Table C3**.
+
+**C6 Classification.** Predict churn probabilities for the test customers. With polars, count true and false positives and negatives at the threshold 0.5, and compute accuracy, precision and recall. Repeat for the threshold 0.3. *Output:* **Table C4**. Which threshold finds more churners, and what is the price of that?
+
+**C7 Who gets a retention offer?** An offer (a free box) costs EUR 5 per customer. It keeps 40 % of the churners who receive it, and each kept customer is worth EUR 80 in margin. Customers who would not have churned anyway also receive the offer if they are above the threshold, so they only cost money. For thresholds from 0.1 to 0.9 (steps of 0.05), compute the expected profit of sending the offer to all test customers above the threshold. *Output:* **Figure C2**: profit by threshold. Recommend a threshold and say how many customers would get the offer.
+
+## Part D: The Q1 2026 baseline for Germany (Session 4)
+
+Work with German weekly orders on the log scale and statsmodels' `SARIMAX` (`from statsmodels.tsa.statespace.sarimax import SARIMAX`).
+
+**D1 The series.** *Output:* **Figure D1**: the autocorrelation of log orders for lags 1 to 26 (`statsmodels.tsa.stattools.acf`, plotted with plotnine). Describe trend, seasonality and autocorrelation in three sentences.
+
+**D2 Compare three forecasts.** Use the weeks up to the end of September 2025 for training and the last 13 weeks of 2025 for testing:
+(i) seasonal naive: each test week gets the orders of the same week one year earlier;
+(ii) ARIMA: `SARIMAX(y, order=(1, 1, 1))`;
+(iii) ARIMAX: the same with explanatory variables (`exog=`): holiday dummies, `free_shipping`, the log of the price and month dummies (`to_dummies()` in polars, drop one month).
+*Output:* **Table D1**: the mean absolute percentage error (MAPE) of the three forecasts on the 13 test weeks. Why does the ARIMA without explanatory variables struggle in this period?
+
+**D3 Residual check.** For the ARIMAX, plot the autocorrelation of the residuals and report Prob(Q) from `result.summary()`. Are the errors still related?
+
+**D4 Forecast Q1 2026.** Refit the ARIMAX on all 156 weeks and forecast the 13 weeks in `plan_q1_2026.csv` for Germany, using the planned values as `exog`. Use `result.get_forecast(13, exog=...)`, then `.predicted_mean` and `.conf_int(alpha=0.05)`, and transform back with `np.exp`. *Output:* **Figure D2**: the last year of orders and the forecast with its 95 % interval (`geom_ribbon`); **Table D2**: the forecast per week with its interval, and the quarter total.
+
+**D5 Read the forecast.** In four sentences: what baseline should Germany plan for, how uncertain is it, and which assumptions in the plan matter most?
+
+## Part E: Recommendation and report
+
+**E1 Executive summary** (at the top of the report, at most 300 words): your answers to the four questions, with the key numbers and one sentence on the main limitation.
+
+**E2 Recommendations** (at most one page): pricing by country, the role of TV and branded search, paid social and free shipping, the retention-offer threshold and the Q1 planning baseline. Each recommendation names the table or figure it rests on.
+
+**E3 Limitations**: what the data cannot tell you (causality, omitted variables, the synthetic data) and what Alpenglow should test next.
+
+**E4 Appendix**: your AI prompt log (the prompts you used, what you kept and what you corrected) and a contribution statement (who did what, signed by all members).
+
+# Report format
+
+- One Quarto file `report.qmd` that renders without errors from a fresh copy of your repository (`quarto render report.qmd`) to a single, self-contained `report.html`. Use the YAML header of the template: `embed-resources: true`, `code-fold: true`, `toc: true`.
+- All tables with great_tables, all figures with plotnine, all data work with polars, all models with statsmodels.
+- Length: at most 3 000 words of text, excluding code, tables, figure captions and the appendix. Short and precise beats long.
+- Every number in the text is computed in the report (inline code, for example `` `{python} f"{elasticity_de:.2f}"` ``), not typed in by hand.
+
+# Submission
+
+Upload **both** files, `report.qmd` and `report.html`, to the Canvas assignment **by Monday 30 November 2026, 23:59 (Vienna time)**. One member submits for the group; the names of all members are in the YAML header (`author:`). Keep your repository: we may ask you to show it.
+
+# Assessment criteria
+
+The case study is scored on **100 points** and counts **30 %** of the final grade. Every criterion is scored on four levels:
+
+| Level | Meaning | Share of the criterion's points |
+|---|---|---|
+| **Excellent** | correct, complete, clearly interpreted, would convince a critical manager and a careful analyst | 90 to 100 % |
+| **Good** | correct and complete, with minor gaps in interpretation or presentation | 75 to 89 % |
+| **Adequate** | runs and produces the outputs, but with errors, omissions or interpretations a manager would challenge | 60 to 74 % |
+| **Insufficient** | missing, wrong, or not produced by the code | 0 to 59 % |
+
+| Part | Criterion | Points | What earns full points |
+|---|---|---:|---|
+| **A** | A1 to A2 data check and figures | 4 | Correct counts and missing values; Table A1 and Figures A1 to A2 complete, labelled and readable |
+| | A3 first regression | 4 | Correct model; coefficients interpreted with units and sign; country coefficients explained |
+| | A4 model fit | 3 | R², adjusted R² and RMSE reported and compared correctly |
+| | A5 assumptions | 4 | Residual plot, histogram, Durbin-Watson and VIF shown and described correctly in plain words |
+| **B** | B1 price elasticities | 6 | Correct log-log model with controls; elasticities interpreted as percentages; sensible pricing implication |
+| | B2 temperature | 4 | Squared term estimated; peak temperature and hot-week drop computed and shown in Figure B1 |
+| | B3 adstock and saturation | 6 | Adstock applied within countries; TV decay chosen by R²; response curve shows diminishing returns and is explained |
+| | B4 moderation | 4 | Interaction specified correctly and interpreted as a difference in the effect of paid social |
+| | B5 mediation | 6 | Three regressions estimated; change in the TV coefficient explained; correct conclusion about TV and branded search |
+| | B6 assumptions | 4 | Checks repeated and compared with A5; remaining problem named |
+| **C** | C1 to C2 exploration and split | 4 | Churn rates correct; Figure C1 shows the plan × late-deliveries pattern; reproducible split |
+| | C3 logistic regression | 5 | Correct model on training data; odds ratios with intervals interpreted correctly, including the interaction |
+| | C4 to C5 fit and assumptions | 5 | Pseudo R² and AIC comparison; checks of duplicates, events per coefficient and VIF |
+| | C6 to C7 classification and offer | 6 | Confusion matrices and metrics correct for both thresholds; profit by threshold correct; threshold recommended with the number of customers |
+| **D** | D1 the series | 4 | ACF plotted and trend, seasonality and autocorrelation described correctly |
+| | D2 three forecasts | 7 | Correct train and test weeks; seasonal naive, ARIMA and ARIMAX compared on MAPE; weakness of plain ARIMA explained |
+| | D3 residual check | 3 | Residual autocorrelation and Prob(Q) reported and read correctly |
+| | D4 to D5 forecast | 6 | Forecast built with the plan file and transformed back; Figure D2 and Table D2 complete; read as a planning baseline with its uncertainty |
+| **E** | E1 to E3 recommendation and limitations | 8 | Summary answers all four questions with numbers; recommendations follow from the results; honest limitations and a next test |
+| | Reproducibility and presentation | 7 | `report.qmd` renders from a fresh copy without errors; numbers in the text come from code; tables with great_tables, figures with plotnine; clear structure within the word limit; prompt log and contribution statement present |
+| | **Total** | **100** | |
+
+**Two rules.** If `report.qmd` does not render, the report is assessed from `report.html` alone and the reproducibility criterion scores 0. If a number in the text does not match the code, the criterion it belongs to is capped at *Adequate*. Late submissions are handled as stated in the syllabus.
+
+# Where each part is taught
+
+| Part | Session | Lab skills you will reuse |
+|---|---|---|
+| A | 1: Introduction and linear regression | polars data checks, plotnine, OLS, R² and RMSE, interpreting coefficients, residual plots |
+| B | 2: Advanced regression | log-log models, dummies, squared terms, interactions, mediation, adstock and saturation, VIF and Durbin-Watson |
+| C | 3: Logistic regression | logit, odds ratios, pseudo R², confusion matrix, precision and recall, thresholds |
+| D | 4: ARIMA | autocorrelation, ARIMA and ARIMAX, residual check, forecast intervals |
+| E | all | Quarto reporting, great_tables, writing for managers |
+
+Questions about the brief go to the Q&A forum on Canvas, so that every group gets the same answer.

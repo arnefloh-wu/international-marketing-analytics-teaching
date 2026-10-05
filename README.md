@@ -12,6 +12,7 @@ This repository holds what you need on your laptop for the course: the synthetic
 | `data/legacy/` | Two warm-up datasets for Session 1: video game sales and a four-brand chocolate panel |
 | `sessions/01-foundations/lab.qmd` | Lab 1: Positron and GitHub Desktop tour, video game warm-up, price elasticities for six countries |
 | `assets/mma.py` | Helper functions the labs import (data loading, seasonality terms, error measures) |
+| `case-study/` | The group case study: brief and assessment criteria (`brief.pdf`, `brief.qmd`) and the report template `report.qmd`. Due 30 November 2026, 23:59 |
 | `requirements.txt` | The Python packages and versions we all use |
 | `setup/check_setup.py` | Checks Python, the packages, Quarto and Git, and prints `ready` |
 | `test_stack.qmd` | Runs polars, plotnine and statsmodels on the data and renders the result with Quarto |
