@@ -14,6 +14,7 @@ This repository holds what you need on your laptop for the course: the synthetic
 | `assets/mma.py` | Helper functions the labs import (data loading, seasonality terms, error measures) |
 | `case-study/` | The group case study: brief and assessment criteria (`brief.pdf`, `brief.qmd`) and the report template `report.qmd`. Due Monday 30 November 2026, midnight |
 | `requirements.txt` | The Python packages and versions we all use |
+| `slides/01a_setup-and-registration_WT26-27.pdf` / `.pptx` | The Session 1 set-up and registration slides: accounts, installation, Positron, GitHub Desktop, Quarto, the packages, updating within Positron |
 | `setup/setup-guide.pdf` / `.qmd` | Step-by-step set-up: accounts, Python 3.14, Positron, Quarto, GitHub Desktop, the project environment, AI assistants, updating within Positron, troubleshooting |
 | `setup/check_setup.py` | Checks Python, the packages, Quarto and Git, and prints `ready` |
 | `test_stack.qmd` | Single-file stack test: installs and loads polars, plotnine, great_tables and statsmodels, reads the data from GitHub and renders a table, a chart and a regression |
