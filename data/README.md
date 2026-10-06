@@ -49,4 +49,4 @@ Data for the group case study. Brief: `case-study/brief.pdf`.
 ## `data/legacy/`: warm-up datasets for Session 1
 
 - `Video_Games_Sales.csv`: sales of 16 719 video games in North America, Europe, Japan and the rest of the world (millions of units), with genre, platform, critic and user scores. Public dataset from Kaggle ("Video Game Sales with Ratings", based on VGChartz and Metacritic).
-- `chocolate_dataset.xlsx`: 68 weeks of sales, prices, features and displays for four chocolate brands (Lab 1, exercise 4).
+- `chocolate_dataset.csv` (and the original `.xlsx`): real weekly scanner data, 68 weeks. Unit sales of brand 1; prices (`price1` to `price4`), feature ads (`feature1` to `feature4`), displays (`display1` to `display4`) and feature-and-display (`fand1`, `fand3`, `fand4`; shares of stores, 0 to 1) of four chocolate brands; `temp` (°C), `december` and `easter` dummies; `week` 1 to 68. Used in Lab 1 (exercise 4), the regression slides, `sessions/01-foundations/regression_chocolate.qmd` and coding exercise 1. Read the CSV with `pl.read_csv`; reading the .xlsx needs an extra package.
