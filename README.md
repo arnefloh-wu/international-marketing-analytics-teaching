@@ -14,9 +14,8 @@ This repository holds what you need on your laptop for the course: the synthetic
 | `assets/mma.py` | Helper functions the labs import (data loading, seasonality terms, error measures) |
 | `case-study/` | The group case study: brief and assessment criteria (`brief.pdf`, `brief.qmd`) and the report template `report.qmd`. Due Monday 30 November 2026, midnight |
 | `requirements.txt` | The Python packages and versions we all use |
-| `slides/01b_statistics-refresher_WT26-27.pdf` / `.pptx` | Session 1 statistics refresher: scale types, mean and median, variance, standard deviation, standard error, z-scores, normal distribution, covariance and correlation |
+| `slides/01b_statistics-and-regression_WT26-27.pdf` / `.pptx` | Session 1 slides in two halves. Statistics refresher (Parts 1 to 5): scale types, mean and median, variance, standard deviation, standard error, z-scores, normal distribution, covariance and correlation, by hand in Python. Linear regression (Parts 6 to 11): theory, assumptions and tests, real-world uses, the chocolate data in Python, in-class assignment, coding exercise 1. A five-question quiz after each half |
 | `sessions/01-foundations/stats_refresher.qmd` | The refresher calculations by hand in Python, with the in-class exercise |
-| `slides/01c_linear-regression_WT26-27.pdf` / `.pptx` | Session 1 regression slides: theory, assumptions and tests, real-world uses, the chocolate data in Python, in-class assignment, coding exercise 1 |
 | `sessions/01-foundations/regression_chocolate.qmd` | The regression code of the slides on the chocolate data, with the in-class questions |
 | `exercises/exercise-1.qmd` / `.pdf` | Coding exercise 1 (individual, 5 %): tasks, submission and grading |
 | `slides/01a_setup-and-registration_WT26-27.pdf` / `.pptx` | The Session 1 set-up and registration slides: accounts, installation, Positron, GitHub Desktop, Quarto, the packages, updating within Positron |
