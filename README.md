@@ -22,6 +22,7 @@ This repository holds what you need on your laptop for the course: the synthetic
 | `setup/setup-guide.pdf` / `.qmd` | Step-by-step set-up: accounts, Python 3.14, Positron, Quarto, GitHub Desktop, the project environment, AI assistants, updating within Positron, troubleshooting |
 | `setup/check_setup.py` | Checks Python, the packages, Quarto and Git, and prints `ready` |
 | `.claude/skills/polish-slides/` | Claude Code skill used to build and check the course slides: WU template, a render-and-check script (`scripts/check_deck.py`) and design patterns. Claude Code in Positron loads it automatically when you open this folder; the part on build scripts refers to the instructor's course repository |
+| `.claude/skills/add-instructor-slide/` | Claude Code skill that adds the instructor's two profile slides (Module Convenor, Work Experience) to a deck on the WU template: `python scripts/add_instructor_slides.py deck.pptx` |
 | `test_stack.qmd` | Single-file stack test: installs and loads polars, plotnine, great_tables and statsmodels, reads the data from GitHub and renders a table, a chart and a regression |
 
 ## Get it onto your laptop
