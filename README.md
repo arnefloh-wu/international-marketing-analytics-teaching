@@ -14,6 +14,8 @@ This repository holds what you need on your laptop for the course: the synthetic
 | `assets/mma.py` | Helper functions the labs import (data loading, seasonality terms, error measures) |
 | `case-study/` | The group case study: brief and assessment criteria (`brief.pdf`, `brief.qmd`) and the report template `report.qmd`. Due Monday 30 November 2026, midnight |
 | `requirements.txt` | The Python packages and versions we all use |
+| `slides/00a_course-content-and-style_WT26-27.pdf` / `.pptx` | Course outline: instructor, learning outcomes, schedule, assessment and the group case study |
+| `slides/02a_intro-to-mmm_WT26-27.pdf` / `.pptx` | Session 2: introduction to marketing mix modelling: key terms, ad spend and attribution, how MMM works, and the discussion of the HBR reading (the article itself is on Canvas) |
 | `slides/01b_statistics-and-regression_WT26-27.pdf` / `.pptx` | Session 1 slides in two halves. Statistics refresher (Parts 1 to 5): scale types, mean and median, variance, standard deviation, standard error, z-scores, normal distribution, covariance and correlation, by hand in Python. Linear regression (Parts 6 to 11): theory, assumptions and tests, real-world uses, the chocolate data in Python, in-class assignment, coding exercise 1. A five-question quiz after each half |
 | `sessions/01-foundations/stats_refresher.qmd` | The refresher calculations by hand in Python, with the in-class exercise |
 | `sessions/01-foundations/regression_chocolate.qmd` | The regression code of the slides on the chocolate data, with the in-class questions |
