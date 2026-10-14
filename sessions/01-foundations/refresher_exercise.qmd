@@ -7,22 +7,15 @@ format:
     toc: true
 ---
 
-Work in pairs, 20 minutes. The kiosk from the slides kept a record for a whole year. Use the code of `stats_refresher.qmd` as a template, especially Step 6: the functions are the same, only the data are bigger. Write your answers as short sentences below each cell.
+The in-class exercise of the statistics refresher, in three steps:
 
-## With Posit Assistant (optional)
+| Step | What | Time |
+|---|---|---|
+| 1 | **Online quiz 1** on Canvas: five questions, alone, then compare with your neighbour | 3 + 2 minutes |
+| 2 | **Coding exercise** in pairs: Tasks 1 to 5 below with the packages (polars, plotnine, scipy) | 15 minutes |
+| 3 | **Posit Assistant**: the same tasks with the assistant; compare its code and numbers with yours (last section) | 10 minutes |
 
-Try each task yourself first, then ask Posit Assistant and compare.
-
-1. Run the first code cell below, so Posit Assistant sees the data frame `kiosk`.
-2. Open the chat: the Posit Assistant icon in the activity bar, or Ctrl/Cmd + Shift + P → *View: Show Posit Assistant*.
-3. Type `@refresher_exercise.qmd`, then ask for **one task per prompt**, naming the file, the packages and the output. For example:
-
-   > @refresher_exercise.qmd Task 2. Use polars, not pandas. Mean and median of units over all 52 weeks and the median rating, with kiosk.describe(). Write the code into the Task 2 cell and explain each line.
-
-   > Task 5. Correlation of units with price and with temp in polars, p-values with scipy.stats.pearsonr, and a plotnine scatter of units against temp. Run it, then explain r and p for the kiosk owner.
-
-4. It asks before it runs code: **Accept**, **Decline** or reply. Read every edit first. Stay in Normal mode (never `/yolo`); `/ask` gives explanations without edits.
-5. Check its numbers against your own and against Steps 1 to 6 of `stats_refresher.qmd`. Typical slips: pandas instead of polars, `np.std` (divides by n, not n − 1), the wrong weeks.
+Then 5 minutes plenary. The kiosk from the slides kept a record for a whole year. Use the code of `stats_refresher.qmd` as a template, especially Step 6: the functions are the same, only the data are bigger. Write your answers as short sentences below each cell.
 
 ## The data
 
@@ -96,3 +89,20 @@ Tips: `kiosk.select(cs.numeric()).corr()` gives every pair at once; `stats.pears
 ```
 
 *Your answer:*
+
+## Then: the same tasks with Posit Assistant
+
+Only after you have your own solution: ask Posit Assistant and compare.
+
+1. Keep the first code cell run, so Posit Assistant sees the data frame `kiosk`.
+2. Open the chat: the Posit Assistant icon in the activity bar, or Ctrl/Cmd + Shift + P → *View: Show Posit Assistant*.
+3. Type `@refresher_exercise.qmd`, then ask for **one task per prompt**, naming the file, the packages and the output. For example:
+
+   > @refresher_exercise.qmd Task 2. Use polars, not pandas. Mean and median of units over all 52 weeks and the median rating, with kiosk.describe(). Write the code into the Task 2 cell and explain each line.
+
+   > Task 5. Correlation of units with price and with temp in polars, p-values with scipy.stats.pearsonr, and a plotnine scatter of units against temp. Run it, then explain r and p for the kiosk owner.
+
+4. It asks before it runs code: **Accept**, **Decline** or reply. Read every edit first. Stay in Normal mode (never `/yolo`); `/ask` gives explanations without edits.
+5. Compare its code and numbers with yours. Typical slips: pandas instead of polars, `np.std` (divides by n, not n − 1), the wrong weeks.
+
+*Where did Posit Assistant differ from your solution, and who was right?*
