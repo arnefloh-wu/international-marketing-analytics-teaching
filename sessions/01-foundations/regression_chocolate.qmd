@@ -9,7 +9,7 @@ execute:
   warning: false
 ---
 
-The code from Part 4 of the regression slides. Run it cell by cell (Ctrl/Cmd + Enter), then work on the in-class questions at the end. The file sits in `sessions/01-foundations/` of the course repository, so it reads the data two folders up (`../../data/...`). In the Positron console, run from the project folder, the path is `data/legacy/chocolate_dataset.csv`, as on the slides.
+The code from Part 9 of the statistics and regression slides. Run it cell by cell (Ctrl/Cmd + Enter), then work on the in-class questions at the end. The file sits in `sessions/01-foundations/` of the course repository, so it reads the data two folders up (`../../data/...`). In the Positron console, run from the project folder, the path is `data/legacy/chocolate_dataset.csv`, as on the slides.
 
 ## Step 0: install and load the packages
 

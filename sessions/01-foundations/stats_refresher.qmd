@@ -7,7 +7,7 @@ format:
     toc: true
 ---
 
-The code from Part 5 of the statistics refresher slides. Run it cell by cell in Positron (click into a cell, press Ctrl/Cmd + Enter) and compare every result with the slides. Each step first calculates by hand, then checks with the built-in function.
+The code from Part 5 of the statistics and regression slides. Run it cell by cell in Positron (click into a cell, press Ctrl/Cmd + Enter) and compare every result with the slides. Each step first calculates by hand, then checks with the built-in function.
 
 ## Step 0: install and load the packages
 
