@@ -9,7 +9,7 @@ execute:
   warning: false
 ---
 
-The code from Part 9 of the statistics and regression slides. Run it cell by cell (Ctrl/Cmd + Enter), then work on the in-class questions at the end. The file sits in `sessions/01-foundations/` of the course repository, so it reads the data two folders up (`../../data/...`). In the Positron console, run from the project folder, the path is `data/legacy/chocolate_dataset.csv`, as on the slides.
+The code from Part 9 of the statistics and regression slides. Run it cell by cell (Ctrl/Cmd + Enter), then work on the in-class exercise at the end. The file sits in `sessions/01-foundations/` of the course repository, so it reads the data two folders up (`../../data/...`). In the Positron console, run from the project folder, the path is `data/legacy/chocolate_dataset.csv`, as on the slides.
 
 ## Step 0: install and load the packages
 
@@ -122,9 +122,73 @@ hac = model.model.fit(cov_type="HAC", cov_kwds={"maxlags": 1})
 print(f"own price: {hac.params.iloc[1]:.2f}, usual se {model.bse.iloc[1]:.3f}, HAC se {hac.bse.iloc[1]:.3f}")
 ```
 
-## In-class questions (groups of 3, 20 minutes)
+## In-class exercise
 
-1. **Competition:** plot sales against `price2`, `price3` and `price4`. Which brand competes most?
-2. **Displays:** add `display1` and `fand1` to the log-log model. What happens to the VIFs and coefficients, and why?
-3. **Price:** marginal cost is 0.80. What price does the elasticity suggest (p* = cost × ε / (1 + ε))? Why is the real price about 1.50?
-4. **The manager:** write one sentence for the brand manager, with a number and one caveat.
+Three steps, as in the statistics refresher:
+
+| Step | What | Time |
+|---|---|---|
+| 1 | **Online quiz 2** on Canvas: five questions, alone, then compare with your neighbour | 3 + 2 minutes |
+| 2 | **Coding exercise** in pairs: Tasks 1 to 5 below with the packages (polars, statsmodels) | 15 minutes |
+| 3 | **Posit Assistant**: the same tasks with the assistant; compare its code, numbers and wording with yours (last section) | 10 minutes |
+
+Then 5 minutes plenary. Run all cells above first: the tasks use `choc`, `df` and `model`.
+
+### Task 1: explore
+
+`describe()` and `corr()` of `sales` and the four prices. Which competitor price moves most with sales?
+
+```{python}
+# your code here
+```
+
+### Task 2: the simple model
+
+Regress `np.log(sales)` on `np.log(price1)` only. Elasticity and R²?
+
+```{python}
+# your code here
+```
+
+### Task 3: compare
+
+The full model of Step 3 gives −3.64. Why does the simple model differ? Tip: `choc.select(pl.corr("price1", "feature1"))`.
+
+```{python}
+# your code here
+```
+
+*Your answer:*
+
+### Task 4: price
+
+Marginal cost is 0.80. What price does ε = −3.64 suggest (p* = cost × ε / (1 + ε))? Why is the real price about 1.50?
+
+```{python}
+# your code here
+```
+
+*Your answer:*
+
+### Task 5: the manager
+
+One sentence for the brand manager, with a number and one caveat.
+
+*Your answer:*
+
+## Then: the same tasks with Posit Assistant
+
+Only after you have your own solution: ask Posit Assistant and compare.
+
+1. Keep the cells above run, so Posit Assistant sees `choc`, `df` and `model`.
+2. Open the chat: the Posit Assistant icon in the activity bar, or Ctrl/Cmd + Shift + P → *View: Show Posit Assistant*.
+3. Type `@regression_chocolate.qmd`, then ask for **one task per prompt**, naming the file, the packages and the output. For example:
+
+   > @regression_chocolate.qmd Task 2. Read the data with polars, fit np.log(sales) ~ np.log(price1) with statsmodels' formula API. Show the elasticity, its standard error and R², and explain the coefficient in one sentence.
+
+   > Task 3. The full model of Step 3 gives -3.64, the simple model -3.94. Why do they differ? Check the correlation of price1 and feature1 in polars and explain it for a brand manager.
+
+4. It asks before it runs code: **Accept**, **Decline** or reply. Read every edit first. Stay in Normal mode (never `/yolo`).
+5. Compare its code, numbers and wording with yours. Typical slips: scikit-learn instead of statsmodels (no p-values), a missing `np.log`, a log-log coefficient read as units.
+
+*Where did Posit Assistant differ from your solution, and who was right?*
