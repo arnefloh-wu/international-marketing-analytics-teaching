@@ -20,7 +20,8 @@ This repository holds what you need on your laptop for the course: the synthetic
 | `slides/01b_statistics-and-regression_WT26-27.pdf` / `.pptx` | Session 1 slides in two halves. Statistics refresher (Parts 1 to 5), all on one chocolate kiosk: scale types, mean and median, variance, standard deviation, standard error, z-scores, normal distribution, covariance and correlation, by hand in Python, and an in-class exercise on the kiosk's full year. Linear regression (Parts 6 to 10): theory, assumptions and tests, real-world uses, the chocolate data in Python, and an in-class exercise (online quiz, short coding exercise, Posit Assistant). A five-question quiz after each half; the answers follow in class |
 | `sessions/01-foundations/stats_refresher.qmd` | The refresher calculations by hand in Python |
 | `sessions/01-foundations/refresher_exercise.qmd` | In-class exercise of the refresher: one year at the kiosk (`data/kiosk/kiosk_year.csv`) |
-| `sessions/01-foundations/regression_chocolate.qmd` | The regression code of the slides on the chocolate data, with the in-class exercise |
+| `sessions/01-foundations/regression_chocolate.qmd` | The regression code of the slides on the chocolate data |
+| `sessions/01-foundations/regression_exercise.qmd` | In-class exercise of the regression part: price and sales of brand 1 |
 | `exercises/exercise-1.qmd` / `.pdf` | Coding exercise 1 (individual, 5 %): descriptive statistics, correlation, scatterplots, linear and log-log regression on the chocolate data, each part with a code element; submission and grading |
 | `exercises/exercise1_template.qmd` | Template for coding exercise 1: save a copy as `exercise1_lastname.qmd`, fill in the code cells and answers, render and submit |
 | `slides/01a_setup-and-registration_WT26-27.pdf` / `.pptx` | The Session 1 set-up and registration slides: accounts, installation, Positron, GitHub Desktop, Quarto, the packages, updating within Positron |

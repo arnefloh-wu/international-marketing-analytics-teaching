@@ -1,0 +1,98 @@
+---
+title: "In-class exercise: price and sales of brand 1"
+subtitle: "Session 1 · linear regression · International Marketing Analytics"
+format:
+  html:
+    embed-resources: true
+    toc: true
+execute:
+  warning: false
+---
+
+The in-class exercise of the regression part, in four steps, as in the statistics refresher:
+
+| Step | What | Time |
+|---|---|---|
+| 1 | **Online quiz 2** on Canvas: five questions, alone, then compare with your neighbour | 3 + 2 minutes |
+| 2 | **Coding exercise** in pairs: Tasks 1 to 5 below with the packages (polars, statsmodels) | 15 minutes |
+| 3 | **Plenary**: the answers on the slides | 5 minutes |
+| 4 | **Posit Assistant**: the same tasks with the assistant; compare its code, numbers and wording with yours and the answers (last section) | 10 minutes |
+
+The first code cell loads the data and the full model of Step 3 (`model`), so you can start right away; the code of Part 9 is in `regression_chocolate.qmd`.
+
+## The data and the model
+
+`data/legacy/chocolate_dataset.csv`: 68 weeks of real scanner data (see the data slide in Part 9). This file sits in `sessions/01-foundations/`, so it reads the data two folders up (`../../data/...`).
+
+```{python}
+import numpy as np
+import polars as pl
+import statsmodels.formula.api as smf
+
+choc = pl.read_csv("../../data/legacy/chocolate_dataset.csv")
+df = choc.to_pandas()
+model = smf.ols(                        # the full model of Step 3
+    "np.log(sales) ~ np.log(price1) + np.log(price2) + np.log(price3)"
+    " + np.log(price4) + feature1 + temp + december",
+    data=df).fit()
+round(model.params["np.log(price1)"], 2)   # -3.64
+```
+
+## Task 1: explore
+
+`describe()` and `corr()` of `sales` and the four prices. Which competitor price moves most with sales?
+
+```{python}
+# your code here
+```
+
+## Task 2: the simple model
+
+Regress `np.log(sales)` on `np.log(price1)` only. Elasticity and R²?
+
+```{python}
+# your code here
+```
+
+## Task 3: compare
+
+The full model of Step 3 gives −3.64. Why does the simple model differ? Tip: `choc.select(pl.corr("price1", "feature1"))`.
+
+```{python}
+# your code here
+```
+
+*Your answer:*
+
+## Task 4: price
+
+Marginal cost is 0.80. What price does ε = −3.64 suggest (p* = cost × ε / (1 + ε))? Why is the real price about 1.50?
+
+```{python}
+# your code here
+```
+
+*Your answer:*
+
+## Task 5: the manager
+
+One sentence for the brand manager, with a number and one caveat.
+
+*Your answer:*
+
+## Then: the same tasks with Posit Assistant
+
+After your own solution and the plenary: ask Posit Assistant and compare.
+
+1. Keep the first code cell run, so Posit Assistant sees `choc`, `df` and `model`.
+2. Open the chat: the Posit Assistant icon in the activity bar, or Ctrl/Cmd + Shift + P → *View: Show Posit Assistant*.
+3. Type `@regression_exercise.qmd`, then ask for **one task per prompt**, naming the file, the packages and the output. For example:
+
+   > @regression_exercise.qmd Task 2. Read the data with polars, fit np.log(sales) ~ np.log(price1) with statsmodels' formula API. Show the elasticity, its standard error and R², and explain the coefficient in one sentence.
+
+   > Task 3. The full model of Step 3 gives -3.64, the simple model -3.94. Why do they differ? Check the correlation of price1 and feature1 in polars and explain it for a brand manager.
+
+4. It asks before it runs code: **Accept**, **Decline** or reply. Read every edit first. Stay in Normal mode (never `/yolo`).
+5. Compare its code, numbers and wording with yours and with the answers from the plenary. Typical slips: scikit-learn instead of statsmodels (no p-values), a missing `np.log`, a log-log coefficient read as units.
+
+*Where did Posit Assistant differ from your solution, and who was right?*
