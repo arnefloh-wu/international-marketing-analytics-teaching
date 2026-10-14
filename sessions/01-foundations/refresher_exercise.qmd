@@ -15,7 +15,8 @@ The in-class exercise of the statistics refresher, in four steps:
 | 2 | **Coding exercise** in pairs: Tasks 1 to 5 below with the packages (polars, plotnine, scipy) | 15 minutes |
 | 3 | **Plenary**: the answers on the slides | 5 minutes |
 | 4 | **Posit Assistant**: the same tasks with the assistant; compare its code and numbers with yours and the answers (last section) | 10 minutes |
- The kiosk from the slides kept a record for a whole year. Use the code of `stats_refresher.qmd` as a template, especially Step 6: the functions are the same, only the data are bigger. Write your answers as short sentences below each cell.
+
+The kiosk from the slides kept a record for a whole year. Use the code of `stats_refresher.qmd` as a template, especially Step 6: the functions are the same, only the data are bigger. Write your answers as short sentences below each cell.
 
 ## The data
 
@@ -50,7 +51,7 @@ Which scale is each of the six columns: nominal, ordinal, interval or ratio? Wha
 
 ## 2 Centre
 
-Mean and median of `units` over all 52 weeks; the median `rating`. Tip: `kiosk.describe()` shows all columns at once; the 50 % row is the median.
+Mean and median of `units` over all 52 weeks; the median `rating`. Tip: `kiosk.describe()` shows all columns at once; its 50 % row takes the nearest value, `kiosk["units"].median()` gives the exact median (here both 82).
 
 Extra: do weeks with a display sell more? Tip: `kiosk.group_by("display").agg(pl.col("units").mean(), pl.len())`.
 

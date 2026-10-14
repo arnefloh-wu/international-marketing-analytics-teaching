@@ -52,7 +52,7 @@ Use these five variables in Parts 1 and 2: `sales`, `price1`, `feature1`, `displ
 
 ## Part 1: descriptive statistics
 
-**Code element.** `describe()` gives count, mean, standard deviation, min, quartiles (the 50 % row is the median) and max; `GT` turns the result into a clean table.
+**Code element.** `describe()` gives count, mean, standard deviation, min, quartiles and max (with an even number of weeks the 50 % row takes the nearest value; `.median()` averages the two middle weeks, which is the exact median); `GT` turns the result into a clean table.
 
 ```python
 example = ["sales", "price2"]

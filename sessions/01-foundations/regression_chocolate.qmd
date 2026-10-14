@@ -132,7 +132,8 @@ Four steps, as in the statistics refresher:
 | 2 | **Coding exercise** in pairs: Tasks 1 to 5 below with the packages (polars, statsmodels) | 15 minutes |
 | 3 | **Plenary**: the answers on the slides | 5 minutes |
 | 4 | **Posit Assistant**: the same tasks with the assistant; compare its code, numbers and wording with yours and the answers (last section) | 10 minutes |
- Run all cells above first: the tasks use `choc`, `df` and `model`.
+
+Run all cells above first: the tasks use `choc`, `df` and `model`.
 
 ### Task 1: explore
 
