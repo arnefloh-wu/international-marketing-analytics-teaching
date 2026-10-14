@@ -46,6 +46,10 @@ Data for the group case study. Brief: `case-study/brief.pdf`.
 - `plan_q1_2026.csv`: 39 rows (3 countries × 13 weeks, 2025-12-29 … 2026-03-23): the drivers known in advance (prices, discounts, free shipping, holidays, media plan) and `temperature_normal_c`, for the Q1 2026 forecast.
 
 
+## `data/kiosk/kiosk_year.csv`: statistics refresher (Session 1)
+
+The one small example of the statistics refresher, not part of Alpenglow: a chocolate kiosk at the university, 52 weeks, one row per week. `week` (1 to 52; weeks 1 to 5 are the price test of the slides: 2.00 to 4.00 EUR, 110, 100, 80, 70, 40 bars), `price` (EUR; 3.00 regular, 2.50 in four promotion weeks), `units` (bars sold), `temp` (°C), `display` (yes/no), `rating` (median customer rating, 1 to 5 stars). Simulated for teaching. Used on the normal-distribution slides and in `sessions/01-foundations/refresher_exercise.qmd`.
+
 ## `data/legacy/`: warm-up datasets for Session 1
 
 - `Video_Games_Sales.csv`: sales of 16 719 video games in North America, Europe, Japan and the rest of the world (millions of units), with genre, platform, critic and user scores. Public dataset from Kaggle ("Video Game Sales with Ratings", based on VGChartz and Metacritic).

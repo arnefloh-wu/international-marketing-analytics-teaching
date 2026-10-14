@@ -96,26 +96,6 @@ kiosk.select(pl.cov("price", "units").alias("cov"),
  + labs(x="Price (EUR)", y="Bars sold per week"))
 ```
 
-## Your turn: by hand, then in Python
+## Next: the in-class exercise
 
-Five days at the kiosk: temperature and bars sold.
-
-| Day | Temperature (°C) | Bars sold |
-|---|---:|---:|
-| Mon | 10 | 60 |
-| Tue | 15 | 55 |
-| Wed | 20 | 50 |
-| Thu | 25 | 40 |
-| Fri | 30 | 35 |
-
-1. **Scales:** which scale is each column?
-2. **Centre:** mean and median of bars sold.
-3. **Spread:** variance and standard deviation of bars sold, by hand.
-4. **z:** the z-score of the hottest day's sales.
-5. **Together:** covariance and correlation of temperature and bars sold, by hand; then check all results in Python with the code above.
-
-```{python}
-#| eval: false
-days = pl.DataFrame({"temp": [10, 15, 20, 25, 30], "units": [60, 55, 50, 40, 35]})
-# your code here
-```
+The kiosk's full year, 52 weeks, is in `data/kiosk/kiosk_year.csv`. The tasks are in `refresher_exercise.qmd` in this folder: the same steps as above, now on a full year of data.

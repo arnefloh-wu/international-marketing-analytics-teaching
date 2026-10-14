@@ -1,0 +1,77 @@
+---
+title: "In-class exercise: one year at the kiosk"
+subtitle: "Session 1 · statistics refresher · International Marketing Analytics"
+format:
+  html:
+    embed-resources: true
+    toc: true
+---
+
+Work in pairs, 20 minutes. The kiosk from the slides kept a record for a whole year. Use the code of `stats_refresher.qmd` as a template: the functions are the same, only the data are bigger. Write your answers as short sentences below each cell.
+
+## The data
+
+`data/kiosk/kiosk_year.csv`: 52 weeks, one row per week. The data are simulated for teaching.
+
+| Column | Meaning |
+|---|---|
+| `week` | 1 to 52; weeks 1 to 5 are the price test of the slides |
+| `price` | price per bar, EUR: 3.00 regular, 2.50 in four promotion weeks |
+| `units` | bars sold in the week |
+| `temp` | average temperature of the week, °C |
+| `display` | `yes` if a display stood next to the till |
+| `rating` | median customer rating of the week, 1 to 5 stars |
+
+This file sits in `sessions/01-foundations/`, so it reads the data two folders up (`../../data/...`). In the Positron console, run from the project folder, the path is `data/kiosk/kiosk_year.csv`.
+
+```{python}
+import polars as pl
+from plotnine import aes, geom_point, ggplot, labs
+
+kiosk = pl.read_csv("../../data/kiosk/kiosk_year.csv")
+kiosk.head()
+```
+
+## 1 Scales
+
+Which scale is each of the six columns: nominal, ordinal, interval or ratio? What may you calculate for `display` and `rating`?
+
+*Your answer:*
+
+## 2 Centre
+
+Mean and median of `units` over all 52 weeks; the median `rating`.
+
+```{python}
+# your code here
+```
+
+## 3 Spread
+
+Standard deviation and standard error of `units` in the regular-price weeks only. Tip: `regular = kiosk.filter(pl.col("price") == 3.0)`.
+
+```{python}
+# your code here
+```
+
+How does this standard error compare with the 12.2 bars from the five test weeks? Why?
+
+*Your answer:*
+
+## 4 Normal
+
+How many regular-price weeks lie within mean ± 2 sd? Compare with the 95 % of the normal distribution. Which regular week sold the most bars, and what is its z-score?
+
+```{python}
+# your code here
+```
+
+## 5 Together
+
+Correlation of `units` with `price` and with `temp` (all 52 weeks). Plot `units` against `temp`. What does the kiosk owner learn?
+
+```{python}
+# your code here
+```
+
+*Your answer:*
