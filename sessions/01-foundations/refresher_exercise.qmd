@@ -7,7 +7,7 @@ format:
     toc: true
 ---
 
-Work in pairs, 20 minutes. The kiosk from the slides kept a record for a whole year. Use the code of `stats_refresher.qmd` as a template: the functions are the same, only the data are bigger. Write your answers as short sentences below each cell.
+Work in pairs, 20 minutes. The kiosk from the slides kept a record for a whole year. Use the code of `stats_refresher.qmd` as a template, especially Step 6: the functions are the same, only the data are bigger. Write your answers as short sentences below each cell.
 
 ## The data
 
@@ -26,7 +26,9 @@ This file sits in `sessions/01-foundations/`, so it reads the data two folders u
 
 ```{python}
 import polars as pl
+import polars.selectors as cs
 from plotnine import aes, geom_point, ggplot, labs
+from scipy import stats
 
 kiosk = pl.read_csv("../../data/kiosk/kiosk_year.csv")
 kiosk.head()
@@ -40,7 +42,9 @@ Which scale is each of the six columns: nominal, ordinal, interval or ratio? Wha
 
 ## 2 Centre
 
-Mean and median of `units` over all 52 weeks; the median `rating`.
+Mean and median of `units` over all 52 weeks; the median `rating`. Tip: `kiosk.describe()` shows all columns at once; the 50 % row is the median.
+
+Extra: do weeks with a display sell more? Tip: `kiosk.group_by("display").agg(pl.col("units").mean(), pl.len())`.
 
 ```{python}
 # your code here
@@ -68,7 +72,9 @@ How many regular-price weeks lie within mean ± 2 sd? Compare with the 95 % of t
 
 ## 5 Together
 
-Correlation of `units` with `price` and with `temp` (all 52 weeks). Plot `units` against `temp`. What does the kiosk owner learn?
+Correlation of `units` with `price` and with `temp` (all 52 weeks), with p-values. Plot `units` against `temp`. What does the kiosk owner learn?
+
+Tips: `kiosk.select(cs.numeric()).corr()` gives every pair at once; `stats.pearsonr(kiosk["units"], kiosk["temp"])` gives r and the p-value. For `rating` (ordinal) use `method="spearman"`.
 
 ```{python}
 # your code here

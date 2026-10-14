@@ -25,6 +25,7 @@ The code from Part 5 of the statistics and regression slides. Run it cell by cel
 | great-tables | `from great_tables import GT` | formatted tables |
 | statsmodels | `import statsmodels.formula.api as smf` | regression and tests |
 | numpy | `import numpy as np` | `np.log` in model formulas (comes with statsmodels) |
+| scipy | `from scipy import stats` | p-value of a correlation (comes with statsmodels) |
 | pyarrow | no import needed | hands polars data to plotnine and statsmodels |
 | jupyter | no import needed | lets Quarto run Python |
 
@@ -32,11 +33,12 @@ Note the one trap: you install `great-tables` (hyphen) but load `great_tables` (
 
 *Error "No module named ..."?* The packages went to a different Python. In Positron's terminal run `.venv\Scripts\python -m pip install polars plotnine great-tables statsmodels pyarrow jupyter` (macOS: `.venv/bin/python -m pip install ...`), then try again.
 
-**Load every time** Python starts or Quarto renders: this file needs polars and plotnine.
+**Load every time** Python starts or Quarto renders: this file needs polars, plotnine and scipy.
 
 ```{python}
 import polars as pl
 from plotnine import aes, geom_point, ggplot, labs
+from scipy import stats
 ```
 
 ## Step 1: the data and the mean
@@ -95,6 +97,30 @@ kiosk.select(pl.cov("price", "units").alias("cov"),
  + geom_point(size=3)
  + labs(x="Price (EUR)", y="Bars sold per week"))
 ```
+
+## Step 6: descriptive statistics and correlation with polars
+
+Everything of Steps 1 to 4 in a few lines. `describe()` gives count, missing values, mean, standard deviation (n − 1), min, quartiles and max for every column; the 50 % row is the median.
+
+```{python}
+kiosk.select("price", "units").describe()          # mean 80, std 27.39, 50 % = median 80
+```
+
+`corr()` gives the correlation matrix of all selected columns; `pl.corr(..., method="spearman")` correlates the ranks (for ordinal data such as star ratings, or a monotone but curved relationship).
+
+```{python}
+print(kiosk.select("price", "units").corr())       # -0.981
+kiosk.select(pl.corr("price", "units", method="spearman").alias("rho"))   # -1.0
+```
+
+polars gives no p-value. scipy does:
+
+```{python}
+r, p = stats.pearsonr(kiosk["price"], kiosk["units"])
+print(round(r, 3), round(p, 3))                    # -0.981 0.003
+```
+
+With five weeks p = 0.003: even five points are enough when r is −0.98.
 
 ## Next: the in-class exercise
 

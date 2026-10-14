@@ -51,7 +51,14 @@ from statsmodels.stats.stattools import durbin_watson, jarque_bera
 
 ```{python}
 choc = pl.read_csv("../../data/legacy/chocolate_dataset.csv")
-choc.select("sales", "price1", "price2").describe()
+cols = ["sales", "price1", "price2", "price3", "price4"]
+choc.select(cols).describe()
+```
+
+The correlation matrix of sales and the four prices (as in Step 6 of `stats_refresher.qmd`): sales and own price correlate at −0.94.
+
+```{python}
+choc.select(cols).corr()
 ```
 
 ```{python}
