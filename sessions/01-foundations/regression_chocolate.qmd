@@ -124,15 +124,15 @@ print(f"own price: {hac.params.iloc[1]:.2f}, usual se {model.bse.iloc[1]:.3f}, H
 
 ## In-class exercise
 
-Three steps, as in the statistics refresher:
+Four steps, as in the statistics refresher:
 
 | Step | What | Time |
 |---|---|---|
 | 1 | **Online quiz 2** on Canvas: five questions, alone, then compare with your neighbour | 3 + 2 minutes |
 | 2 | **Coding exercise** in pairs: Tasks 1 to 5 below with the packages (polars, statsmodels) | 15 minutes |
-| 3 | **Posit Assistant**: the same tasks with the assistant; compare its code, numbers and wording with yours (last section) | 10 minutes |
-
-Then 5 minutes plenary. Run all cells above first: the tasks use `choc`, `df` and `model`.
+| 3 | **Plenary**: the answers on the slides | 5 minutes |
+| 4 | **Posit Assistant**: the same tasks with the assistant; compare its code, numbers and wording with yours and the answers (last section) | 10 minutes |
+ Run all cells above first: the tasks use `choc`, `df` and `model`.
 
 ### Task 1: explore
 
@@ -178,7 +178,7 @@ One sentence for the brand manager, with a number and one caveat.
 
 ## Then: the same tasks with Posit Assistant
 
-Only after you have your own solution: ask Posit Assistant and compare.
+After your own solution and the plenary: ask Posit Assistant and compare.
 
 1. Keep the cells above run, so Posit Assistant sees `choc`, `df` and `model`.
 2. Open the chat: the Posit Assistant icon in the activity bar, or Ctrl/Cmd + Shift + P → *View: Show Posit Assistant*.
@@ -189,6 +189,6 @@ Only after you have your own solution: ask Posit Assistant and compare.
    > Task 3. The full model of Step 3 gives -3.64, the simple model -3.94. Why do they differ? Check the correlation of price1 and feature1 in polars and explain it for a brand manager.
 
 4. It asks before it runs code: **Accept**, **Decline** or reply. Read every edit first. Stay in Normal mode (never `/yolo`).
-5. Compare its code, numbers and wording with yours. Typical slips: scikit-learn instead of statsmodels (no p-values), a missing `np.log`, a log-log coefficient read as units.
+5. Compare its code, numbers and wording with yours and with the answers from the plenary. Typical slips: scikit-learn instead of statsmodels (no p-values), a missing `np.log`, a log-log coefficient read as units.
 
 *Where did Posit Assistant differ from your solution, and who was right?*
