@@ -14,6 +14,7 @@ format:
 |---|---|
 | **Work** | individual |
 | **Weight** | 5 % of the final grade (20 points) |
+| **Template** | `exercise1_template.qmd` next to this brief: save a copy as `exercise1_lastname.qmd` and fill it in |
 | **Submit** | `exercise1_lastname.qmd` **and** the rendered `.html` on Canvas |
 | **Deadline** | see Canvas |
 | **Data** | `data/legacy/chocolate_dataset.csv` in the course repository: 68 weeks of real scanner data, unit sales of brand 1 and prices, features and displays of four chocolate brands |
@@ -23,6 +24,8 @@ format:
 You apply the five building blocks of Session 1 to the chocolate data: **descriptive statistics, correlation, scatterplots, linear regression and log-log regression**. Each part below starts with a **code element**: a short, working example of the functions you need. The examples use other variables than the task, so adapt them; do not copy them unchanged. Your templates from class: `sessions/01-foundations/stats_refresher.qmd` (Step 6) and `sessions/01-foundations/regression_chocolate.qmd`.
 
 ## Set-up
+
+Start from the template `exercise1_template.qmd`: it already contains the set-up below, one section per part with empty code cells, and the prompt-log table.
 
 **Install once** (skip if you did it in class): pick **Python 3.14 (.venv)** at the top right of Positron and run this line in a cell or the Console. In your submitted file, keep it in a cell with `#| eval: false`, so that Quarto does not run it when rendering.
 

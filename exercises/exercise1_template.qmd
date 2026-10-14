@@ -1,0 +1,121 @@
+---
+title: "Coding exercise 1: descriptive statistics, correlation and regression"
+author: "First name Last name, student ID"
+format:
+  html:
+    toc: true
+    embed-resources: true
+---
+
+<!--
+How to use this template
+1. Save a copy as exercise1_lastname.qmd in the exercises/ folder (File > Save As), next to the brief.
+2. Fill in every cell marked "# your code here" and every line marked *Your answer:*.
+3. Every number in your text comes from code, as inline Python code (see Rules in the brief).
+4. Render with Preview (Ctrl/Cmd + Shift + K) and check that the file runs from top to bottom.
+5. Submit the .qmd and the rendered .html on Canvas.
+The tasks in full are in exercise-1.pdf; the code elements there show the functions you need.
+-->
+
+## Set-up
+
+Install once (Quarto skips this cell when rendering):
+
+```{python}
+#| eval: false
+%pip install polars plotnine great-tables statsmodels pyarrow jupyter
+```
+
+Load the packages and the data:
+
+```{python}
+import numpy as np                       # np.log in model formulas
+import polars as pl                      # data and descriptive statistics
+import statsmodels.formula.api as smf    # regression
+from great_tables import GT              # tables
+from plotnine import aes, geom_point, geom_smooth, ggplot, labs   # charts
+from scipy import stats                  # p-value of a correlation
+
+choc = pl.read_csv("../data/legacy/chocolate_dataset.csv")
+cols = ["sales", "price1", "feature1", "display1", "temp"]
+df = choc.to_pandas()                    # for statsmodels in Parts 4 and 5
+```
+
+## Part 1: descriptive statistics
+
+Table of mean, standard deviation, minimum, median and maximum of the five variables in `cols`.
+
+```{python}
+# your code here
+```
+
+*Your answer:* (mean vs median of sales; what the means of feature1 and display1 say)
+
+## Part 2: correlation
+
+Correlation matrix of the five variables; r and p-value for `sales` and `display1`.
+
+```{python}
+# your code here
+```
+
+*Your answer:* (strongest relationship with sales and its direction; is sales–display significant at 5 %; why the correlation of price1 and feature1 matters for Parts 4 and 5)
+
+## Part 3: scatterplots
+
+Sales against price1, with the least-squares line:
+
+```{python}
+# your code here
+```
+
+Log sales against log price1, with the least-squares line:
+
+```{python}
+# your code here
+```
+
+*Your answer:* (which is closer to a straight line, and what that means for the model)
+
+## Part 4: linear regression
+
+`sales ~ price1 + feature1`
+
+```{python}
+# your code here
+```
+
+*Your answer:* (price effect for 10 cents; feature1 from 0 to 1; significance at 5 %; R²; why feature1 behaves as it does)
+
+## Part 5: log-log regression
+
+`np.log(sales) ~ np.log(price1) + np.log(price2) + np.log(price3) + np.log(price4) + feature1 + display1 + temp + december`
+
+```{python}
+# your code here
+```
+
+**a.** *Your answer:* (own-price elasticity; one competitor price; december with exp(b) − 1; significance at 5 %)
+
+**b.** Number of weeks with a display:
+
+```{python}
+# your code here
+```
+
+*Your answer:* (how much you trust the display1 coefficient)
+
+**c.** Optimal price for a marginal cost of 0.90, p* = cost × ε / (1 + ε):
+
+```{python}
+# your code here
+```
+
+*Your recommendation (at most 100 words, with two caveats):*
+
+## Prompt log
+
+| Prompt (what you asked the AI assistant) | What you kept or changed |
+|---|---|
+| | |
+| | |
