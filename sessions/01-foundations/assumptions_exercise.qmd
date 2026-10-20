@@ -1,0 +1,100 @@
+---
+title: "In-class exercise: which model may brand 1 trust?"
+subtitle: "Linear regression, part 2 · assumptions, dummies, curves · International Marketing Analytics"
+format:
+  html:
+    embed-resources: true
+    toc: true
+execute:
+  warning: false
+---
+
+The in-class exercise of deck 01e, in four steps:
+
+| Step | What | Time |
+|---|---|---|
+| 1 | **Online quiz 3** on Canvas: five questions, alone, then compare with your neighbour | 3 + 2 minutes |
+| 2 | **Coding exercise** in pairs: Tasks 1 to 5 below with the packages (polars, statsmodels, scipy, plotnine) | 15 minutes |
+| 3 | **Plenary**: the answers on the slides | 5 minutes |
+| 4 | **Posit Assistant**: the same tasks with the assistant; compare its code, numbers and wording with yours and the answers (last section) | 10 minutes |
+
+Use the code of `regression_assumptions.qmd` as a template: the functions are the same, the models are smaller.
+
+## The data
+
+`data/legacy/chocolate_dataset.csv`: 68 weeks of real scanner data for brand 1 (see the data slide in deck 01b, Part 9). This file sits in `sessions/01-foundations/`, so it reads the data two folders up (`../../data/...`).
+
+```{python}
+import numpy as np
+import polars as pl
+import statsmodels.formula.api as smf
+from plotnine import aes, geom_hline, geom_point, ggplot, labs
+from statsmodels.stats.diagnostic import het_breuschpagan, linear_reset
+from statsmodels.stats.stattools import jarque_bera
+
+choc = pl.read_csv("../../data/legacy/chocolate_dataset.csv")
+df = choc.to_pandas()
+```
+
+## Task 1: look
+
+Fit `lin1 = sales ~ price1` and `ll1 = np.log(sales) ~ np.log(price1)`. Draw the residuals against the fitted values for each model. Which plot shows a curve, which a funnel?
+
+```{python}
+# your code here
+```
+
+*Your answer:*
+
+## Task 2: test
+
+RESET (`linear_reset(m, power=2, use_f=True).pvalue`), Breusch-Pagan (`het_breuschpagan(m.resid, m.model.exog)[1]`) and Jarque-Bera (`jarque_bera(m.resid)[1]`) for both models. Which model fails which assumption? Remember: a small p means a problem.
+
+```{python}
+# your code here
+```
+
+*Your answer:*
+
+## Task 3: dummies
+
+Build `season` from `temp` with polars: cold below 5 °C, mild below 15 °C, warm otherwise (`pl.when(...).then(...).when(...).then(...).otherwise(...)`). How many weeks in each band? Then fit `np.log(sales) ~ np.log(price1) + december + C(season, Treatment("mild"))` and give `december` and the two season dummies in per cent (exp(b) − 1), with p-values.
+
+```{python}
+# your code here
+```
+
+*Your answer:*
+
+## Task 4: curve
+
+Fit `sales ~ price1 + I(price1**2)`. Where is the turning point (−b1 / (2 b2))? Is it inside the price range of the data?
+
+```{python}
+# your code here
+```
+
+*Your answer:*
+
+## Task 5: the manager
+
+Which model do you report to the brand manager, and why? One sentence with a number.
+
+*Your answer:*
+
+## Then: the same tasks with Posit Assistant
+
+After your own solution and the plenary: ask Posit Assistant and compare.
+
+1. Keep the first code cell run, so Posit Assistant sees `choc` and `df`.
+2. Open the chat: the Posit Assistant icon in the activity bar, or Ctrl/Cmd + Shift + P → *View: Show Posit Assistant*.
+3. Type `@assumptions_exercise.qmd`, then ask for **one task per prompt**, naming the file, the packages and the output. For example:
+
+   > @assumptions_exercise.qmd Task 2. Run RESET, Breusch-Pagan and Jarque-Bera with statsmodels for lin1 and ll1. Show the p-values in one table and explain in one sentence each which assumption fails.
+
+   > Task 3. Build season from temp with polars when/then (cold < 5, mild < 15, warm). Fit the model with C(season, Treatment("mild")) and give each dummy in per cent with exp(b) - 1.
+
+4. It asks before it runs code: **Accept**, **Decline** or reply. Read every edit first. Stay in Normal mode (never `/yolo`).
+5. Compare its code, numbers and wording with yours and with the answers from the plenary. Typical slips: tests run on `sales` instead of the residuals, all three season dummies plus the intercept (the dummy trap), 100 × b instead of exp(b) − 1, a turning point read outside the data.
+
+*Where did Posit Assistant differ from your solution, and who was right?*
