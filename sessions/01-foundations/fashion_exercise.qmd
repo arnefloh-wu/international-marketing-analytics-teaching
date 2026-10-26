@@ -1,0 +1,115 @@
+---
+title: "In-class exercise: one fashion brand, twelve countries"
+subtitle: "Linear regression, part 2 · log-log and country dummies on real platform data · International Marketing Analytics"
+format:
+  html:
+    embed-resources: true
+    toc: true
+execute:
+  warning: false
+---
+
+A fashion brand sells on a large online fashion platform in twelve European countries. You have its sales by article type and country for two collections, Spring/Summer 2025 and 2026. The brand manager asks: **where do product page views turn into sales, and should we invest in Switzerland, our newest market?**
+
+| Step | What | Time |
+|---|---|---|
+| 1 | **Coding exercise** in pairs: Tasks 1 to 5 below with the packages (polars, great_tables, statsmodels, plotnine) | 20 minutes |
+| 2 | **Plenary**: the answers | 5 minutes |
+| 3 | **Posit Assistant**: the same tasks with the assistant; compare its code, numbers and wording with yours (last section) | 10 minutes |
+
+Use `regression_assumptions.qmd` as a template: log-log models, `C()` dummies, `exp(b) − 1` and the tests are the same.
+
+## The data
+
+`data/fashion/fashion_countries.csv` (see `data/fashion/README.md`): one row per season, country and article type, 403 rows. Real data, anonymised: volumes and money are rescaled, shares and conversion are original. This file sits in `sessions/01-foundations/`, so it reads the data two folders up.
+
+| Column | Meaning |
+|---|---|
+| `season`, `country`, `article_type` | SS25 or SS26; AT, BE, CH, CZ, DE, DK, FI, FR, IT, NL, PL, SE; Dress, Trouser, … |
+| `pdp_views` | product page views |
+| `sold_articles`, `conversion_pct` | articles sold; sold per 100 page views |
+| `avg_item_value` | average gross price per sold article (incl. VAT) |
+| `nmv` | net merchandise value: sales net of VAT |
+| `discount_pct`, `size_availability_pct` | average discount; share of sizes in stock |
+| `return_rate_pct` | estimated return rate, SS26 only |
+
+```{python}
+import numpy as np
+import polars as pl
+import statsmodels.formula.api as smf
+from great_tables import GT
+from plotnine import aes, geom_hline, geom_point, ggplot, labs
+from statsmodels.stats.diagnostic import het_breuschpagan
+
+fashion = pl.read_csv("../../data/fashion/fashion_countries.csv")
+fashion.head()
+```
+
+## Task 1: the markets
+
+For SS26, one row per country: NMV, sold articles, page views, **sold per 100 views** (100 × sold / views) and the return rate weighted by sold articles. Show it as a great_tables table, sorted by NMV. Which three markets are the largest? Where do page views turn into sales best and worst?
+
+Tip: `fashion.filter(pl.col("season") == "SS26").group_by("country").agg(...)`; for the weighted return rate `(pl.col("return_rate_pct") * pl.col("sold_articles")).sum() / pl.col("sold_articles").sum()`.
+
+```{python}
+# your code here
+```
+
+*Your answer:*
+
+## Task 2: the funnel
+
+Both seasons, rows with sales only (`pl.col("sold_articles") > 0`): fit `np.log(sold_articles) ~ np.log(pdp_views)`. Interpret the coefficient. Why do you drop the rows without sales?
+
+```{python}
+# your code here
+```
+
+*Your answer:*
+
+## Task 3: country dummies
+
+Add the countries, with Germany as reference, and the season: `+ C(country, Treatment("DE")) + C(season)`. Give each country effect in per cent (exp(b) − 1). Which markets sell clearly less than Germany **at the same number of page views**? Give two possible reasons from international marketing.
+
+```{python}
+# your code here
+```
+
+*Your answer:*
+
+## Task 4: price, discount, sizes
+
+Add `np.log(avg_item_value) + discount_pct + size_availability_pct` to the model of Task 3. Interpret the three coefficients. Is the price coefficient a price elasticity you could use for pricing? Then check the residuals (plot against fitted values, Breusch-Pagan) and refit with `cov_type="HC3"`: does any conclusion change?
+
+```{python}
+# your code here
+```
+
+*Your answer:*
+
+## Task 5: Switzerland
+
+Switzerland (CH) is new in SS26. Compare CH with DE and AT in SS26: sold per 100 views, average item value and return rate (from Task 1), and the country effect (Task 3). Compute `nmv / (sold_articles * avg_item_value)` by country: why is it higher in CH? In one or two sentences: should the brand invest more in Switzerland?
+
+```{python}
+# your code here
+```
+
+*Your answer:*
+
+## Then: the same tasks with Posit Assistant
+
+After your own solution and the plenary: ask Posit Assistant and compare.
+
+1. Keep the first code cell run, so Posit Assistant sees `fashion`.
+2. Open the chat: the Posit Assistant icon in the activity bar, or Ctrl/Cmd + Shift + P → *View: Show Posit Assistant*.
+3. Type `@fashion_exercise.qmd`, then ask for **one task per prompt**, naming the file, the packages and the output. For example:
+
+   > @fashion_exercise.qmd Task 1. With polars, for season SS26 only, make one row per country with NMV, sold articles, page views, sold per 100 views and the return rate weighted by sold articles. Show it as a great_tables table sorted by NMV and name the three largest markets.
+
+   > Task 3. Fit np.log(sold_articles) ~ np.log(pdp_views) + C(country, Treatment("DE")) + C(season) with statsmodels on rows with sales. Give every country effect in per cent with exp(b) - 1 and explain the result for Italy in one sentence.
+
+4. It asks before it runs code: **Accept**, **Decline** or reply. Read every edit first. Stay in Normal mode (never `/yolo`).
+5. Compare its code, numbers and wording with yours. Typical slips: `np.log` of zero sales, 100 × b instead of exp(b) − 1, the alphabetical reference country (AT) instead of DE, an unweighted mean of return rates, a cross-sectional price coefficient read as a price elasticity.
+
+*Where did Posit Assistant differ from your solution, and who was right?*

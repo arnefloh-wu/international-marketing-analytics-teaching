@@ -10,6 +10,7 @@ This repository holds what you need on your laptop for the course: the synthetic
 |---|---|
 | `data/` | Alpenglow, a fictional premium chocolate brand in six European markets: weekly sales and media spend, a geo-lift experiment and customer journeys. See [`data/README.md`](data/README.md) |
 | `data/kiosk/` | The chocolate kiosk of the statistics refresher: one year, 52 weeks |
+| `data/fashion/` | One fashion brand on an online fashion platform in twelve European countries, SS25 and SS26 collections: page views, sales, prices, returns by article type and country (real data, anonymised). See [`data/fashion/README.md`](data/fashion/README.md) |
 | `data/legacy/` | Two warm-up datasets for Session 1: video game sales and a four-brand chocolate panel |
 | `sessions/01-foundations/lab.qmd` | Lab 1: Positron and GitHub Desktop tour, video game warm-up, price elasticities for six countries |
 | `assets/mma.py` | Helper functions the labs import (data loading, seasonality terms, error measures) |
@@ -25,6 +26,7 @@ This repository holds what you need on your laptop for the course: the synthetic
 | `slides/01e_regression-assumptions-dummies-nonlinear_WT26-27.pdf` / `.pptx` | Regression, part 2: assumptions and how to test them (residual and Q-Q plots, RESET, Breusch-Pagan, Jarque-Bera, VIF, Cook's distance, robust errors), dummy coding (reference group, the dummy trap), log-log and the other log forms, non-linear relationships (squares, turning points), the analyses in Python, and an in-class exercise (online quiz 3, coding exercise, Posit Assistant). The quiz and exercise answers follow in class |
 | `sessions/01-foundations/regression_assumptions.qmd` | The code of deck 01e on the chocolate data: both models, residual plots, tests, dummies, the quadratic |
 | `sessions/01-foundations/assumptions_exercise.qmd` | In-class exercise of deck 01e: which model may brand 1 trust? |
+| `sessions/01-foundations/fashion_exercise.qmd` | In-class exercise of deck 01e on the fashion data: markets, the views-to-sales funnel in logs, country dummies, Switzerland as a new market |
 | `exercises/` | Coding exercises: put your personal brief, template and data from Canvas here (see `exercises/README.md`) |
 | `slides/01a_setup-and-registration_WT26-27.pdf` / `.pptx` | The Session 1 set-up and registration slides: accounts, installation, Positron, GitHub Desktop, Quarto, the packages, updating within Positron |
 | `slides/how-brands-grow_double-jeopardy-and-distinctiveness_WT26-27.pdf` / `.pptx` | Lecture on How Brands Grow (Ehrenberg-Bass Institute), 36 slides in six parts: brand management basics (what a brand is, tangible and intangible elements, Manner as an example), the laws of brand buying (Double Jeopardy, Duplication of Purchase, the NBD-Dirichlet benchmark, light buyers), how brands grow (penetration, Kantar Brand Footprint evidence, mental and physical availability, the B2B 95:5 rule, Category Entry Points), brand distinctiveness (fame and uniqueness grid, six sourced cases from Tropicana to Cadbury), critiques and the Binet & Field debate, and a Double Jeopardy data lab with a distinctive asset audit |
