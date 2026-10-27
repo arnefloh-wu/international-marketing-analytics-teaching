@@ -70,7 +70,7 @@ How to read it: the baselines differ a lot between the countries, and the baseli
 
 ## Step 1: odds, odds ratio and log-odds by hand
 
-The calculator examples of the slides, with invented round counts (not the data): in Germany 50 of 100 month-to-month customers and 20 of 100 customers on a 24-month contract churn; in Spain 60 of 100 and 30 of 100. The function below takes counts by country and contract and returns the probability, the odds and the log-odds, and then the ratios of month-to-month vs 24-month.
+The calculator examples of the slides, with invented round counts (not the data): in Germany 25 of 100 month-to-month customers and 10 of 100 customers on a 24-month contract churn; in Spain 45 of 100 and 25 of 100 (close to the data: 26 % vs 10 % and 47 % vs 25 %). The function below takes counts by country and contract and returns the probability, the odds and the log-odds, and then the ratios of month-to-month vs 24-month.
 
 ```{python}
 def odds_table(counts):
@@ -88,7 +88,7 @@ def odds_table(counts):
 
 
 calculator = pl.DataFrame({"country": ["DE", "DE", "ES", "ES"], "monthly": [1, 0, 1, 0],
-                           "customers": [100, 100, 100, 100], "churners": [50, 20, 60, 30]})
+                           "customers": [100, 100, 100, 100], "churners": [25, 10, 45, 25]})
 long, ratios = odds_table(calculator)
 GT(long).fmt_number(columns=["p", "odds"], decimals=4).fmt_number(columns="log_odds", decimals=3) \
     .tab_header(title="Calculator example: invented counts", subtitle="monthly = 1: month-to-month")
@@ -101,7 +101,7 @@ GT(ratios).fmt_number(columns=["gap_pp"], decimals=1) \
     .tab_header(title="Month-to-month vs 24-month: invented counts")
 ```
 
-Both countries have the same gap of 30 percentage points (pp), but different odds ratios (4.0 in Germany, 3.5 in Spain) and risk ratios (2.5 and 2.0). The difference of the log-odds (1.386 and 1.253) is the log of the odds ratio. A logit with `monthly` alone returns exactly these numbers: the intercept is the log-odds of the 24-month customers, the coefficient the difference of the log-odds. To check, we build the 200 customers of each country from the counts.
+Germany has the larger odds ratio (3.0 vs 2.45), Spain the larger gap in percentage points (pp: 20 vs 15); the risk ratios are 2.5 and 1.8. The two scales rank the countries differently, the puzzle of Part 3 of the deck. The difference of the log-odds (1.099 and 0.898) is the log of the odds ratio. A logit with `monthly` alone returns exactly these numbers: the intercept is the log-odds of the 24-month customers, the coefficient the difference of the log-odds. To check, we build the 200 customers of each country from the counts.
 
 ```{python}
 def from_counts(churners_monthly, churners_24_month, n=100):
@@ -112,8 +112,8 @@ def from_counts(churners_monthly, churners_24_month, n=100):
                   + [1] * churners_24_month + [0] * (n - churners_24_month))}).to_pandas()
 
 
-de = from_counts(50, 20)
-es = from_counts(60, 30)
+de = from_counts(25, 10)
+es = from_counts(45, 25)
 smf.logit("churn ~ monthly", data=es).fit().params
 ```
 
@@ -753,7 +753,7 @@ How to read it: the ranking travels, the level does not; shifting the intercept 
 
 ## Your turn
 
-Work in pairs (35 minutes). Use the code of the steps above.
+Work in pairs (35 minutes). Use the code of the steps above. The in-class version of these tasks, with hints and space for your answers, is `churn_exercise.qmd`.
 
 1. **Fit** the pooled churn logit with country dummies (reuse Step 2). How large is the month-to-month AME in each country?
 
