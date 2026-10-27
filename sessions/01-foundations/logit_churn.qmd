@@ -767,7 +767,7 @@ Work in pairs (35 minutes). Use the code of the steps above.
 # your code
 ```
 
-3. **Evaluate** on the 30 % test set: compute the top-decile lift and draw a calibration plot (Steps 9 and 10).
+3. **Evaluate** on the 30 % test set: compute the confusion matrix at 0.5 and the top-decile lift (Steps 8 and 9).
 
 ```{python}
 # your code
