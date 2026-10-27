@@ -42,6 +42,36 @@ GT(overview).fmt_percent(columns=["export_share", "rd_share"], decimals=0).tab_h
 
 German SMEs export far more often (84 %) than Hungarian ones (58 %). Keep the baselines in mind: they decide how much a coefficient moves the probability.
 
+## Step 0b: odds, odds ratio and log-odds by hand
+
+The worked example of the slides with the real data: probability, odds and log-odds of exporting by country and R&D.
+
+```{python}
+by_hand = (sme.group_by("country", "rd")
+           .agg(pl.len().alias("firms"), pl.col("exporter").sum().alias("exporters"))
+           .with_columns(p=pl.col("exporters") / pl.col("firms"))
+           .with_columns(odds=pl.col("p") / (1 - pl.col("p")))
+           .with_columns(log_odds=pl.col("odds").log())
+           .sort("country", "rd"))
+GT(by_hand).fmt_number(columns=["p", "odds", "log_odds"], decimals=2).tab_header(title="Exporting by country and R&D")
+```
+
+The odds ratio of R&D is the odds with R&D divided by the odds without; its log is the difference of the log-odds. A logit with `rd` alone gives exactly that number as its coefficient, and the log-odds of the firms without R&D as its intercept:
+
+```{python}
+wide = by_hand.pivot(on="rd", index="country", values=["p", "odds", "log_odds"])
+ratios = wide.select("country",
+                     ((pl.col("p_1") - pl.col("p_0")) * 100).alias("gap_pp"),
+                     (pl.col("odds_1") / pl.col("odds_0")).alias("odds_ratio"),
+                     (pl.col("log_odds_1") - pl.col("log_odds_0")).alias("log_odds_diff"))
+ratios = ratios.with_columns(
+    logit_coef=pl.Series([smf.logit("exporter ~ rd", data=df[df["country"] == c]).fit(disp=0).params["rd"]
+                          for c in ratios["country"]]))
+GT(ratios).fmt_number(columns=["gap_pp", "odds_ratio", "log_odds_diff", "logit_coef"], decimals=2)
+```
+
+`log_odds_diff` and `logit_coef` are the same number. Read the odds ratio as "multiplies the odds", and the gap in percentage points as what R&D does to the probability. The two can rank the countries differently: Germany has the larger odds ratio, Hungary the larger gain in percentage points, because German SMEs without R&D already export at 80 %.
+
 ## Step 1: fit a logit
 
 One pooled model with country dummies (Germany as reference). `smf.logit` works like `smf.ols`; the coefficients are on the log-odds scale.
@@ -145,7 +175,8 @@ The product term is negative, but on the probability scale R&D helps Hungarian S
 
 ## Your turn
 
-1. **Fit**: the logit of Step 1.
-2. **Compute**: the AME of R&D overall and by country (Step 2).
-3. **Compare**: coefficients from separate country models with the marginal effects (Step 3). Which number would you put in a board memo, and why?
-4. **Report**: the export probability of a typical German and Hungarian SME, with confidence intervals (Step 4), and one plot with two sentences for a manager.
+1. **By hand**: probability, odds and log-odds of exporting with and without R&D in each country, and the odds ratio (Step 0b). Check it against the slides' worked example.
+2. **Fit**: the logit of Step 1.
+3. **Compute**: the AME of R&D overall and by country (Step 2).
+4. **Compare**: coefficients from separate country models with the marginal effects (Step 3). Which number would you put in a board memo, and why?
+5. **Report**: the export probability of a typical German and Hungarian SME, with confidence intervals (Step 4), and one plot with two sentences for a manager.
