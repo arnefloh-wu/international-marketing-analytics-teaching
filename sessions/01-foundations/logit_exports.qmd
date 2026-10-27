@@ -1,0 +1,151 @@
+---
+title: "Logistic regression: export probability, Germany vs Hungary"
+subtitle: "Sample code for the deck 'Logistic regression in international marketing' · International Marketing Analytics"
+format:
+  html:
+    embed-resources: true
+    toc: true
+execute:
+  warning: false
+---
+
+The Python version of the code slide and the in-class exercise of the logistic regression deck, with the packages of the course: polars, great_tables, statsmodels and plotnine. The data are simulated in the style of the EU-EFIGE survey (`data/logit/sme_exports.csv`, made by `data/generate_logit_data.py`): 3,000 German and 2,000 Hungarian SMEs with the same true effect of R&D in both countries, but more unobserved variation in Hungary. That is the warm-up of the deck: R&D coefficient 0.8 in Germany, 0.5 in Hungary.
+
+| Column | Meaning |
+|---|---|
+| `firm_id` | firm number |
+| `country` | DE or HU |
+| `employees` | number of employees, 10 to 249 |
+| `rd` | 1 if the firm does R&D |
+| `exporter` | 1 if the firm exports |
+
+This file sits in `sessions/01-foundations/`, so it reads the data two folders up (`../../data/...`).
+
+## Step 0: load and look
+
+```{python}
+import numpy as np
+import polars as pl
+import statsmodels.formula.api as smf
+from great_tables import GT
+from plotnine import aes, geom_line, geom_ribbon, ggplot, labs, scale_y_continuous
+
+sme = pl.read_csv("../../data/logit/sme_exports.csv")
+df = sme.to_pandas()
+
+overview = (sme.group_by("country")
+            .agg(pl.len().alias("firms"), pl.col("exporter").mean().alias("export_share"),
+                 pl.col("rd").mean().alias("rd_share"), pl.col("employees").median().alias("median_employees"))
+            .sort("country"))
+GT(overview).fmt_percent(columns=["export_share", "rd_share"], decimals=0).tab_header(title="SMEs by country")
+```
+
+German SMEs export far more often (84 %) than Hungarian ones (58 %). Keep the baselines in mind: they decide how much a coefficient moves the probability.
+
+## Step 1: fit a logit
+
+One pooled model with country dummies (Germany as reference). `smf.logit` works like `smf.ols`; the coefficients are on the log-odds scale.
+
+```{python}
+m = smf.logit("exporter ~ rd + np.log(employees) + C(country, Treatment('DE'))", data=df).fit(disp=0)
+print(m.summary())
+```
+
+Odds ratios are `exp(b)`. They multiply the odds, they do not say "x times as likely":
+
+```{python}
+ors = pl.DataFrame({"term": m.params.index.to_list(), "b": m.params.to_list(),
+                    "odds_ratio": np.exp(m.params).to_list(), "p": m.pvalues.to_list()})
+GT(ors).fmt_number(columns=["b", "odds_ratio"], decimals=2).fmt_number(columns="p", decimals=3)
+```
+
+## Step 2: average marginal effects
+
+`get_margeff()` gives the average marginal effect (AME): the average change in the probability. `dummy=True` treats `rd` as a 0/1 switch (a discrete change from 0 to 1) instead of a slope.
+
+```{python}
+print(m.get_margeff(at="overall", dummy=True).summary())
+```
+
+The AME of R&D **by country**: predict every firm with `rd = 1` and with `rd = 0`, take the difference, average it within each country. This is what `avg_comparisons(..., by = "country")` does in R.
+
+```{python}
+def ame_rd(model, data, by="country"):
+    """Average change in the export probability from rd = 0 to rd = 1, by group."""
+    with_rd, without_rd = data.assign(rd=1), data.assign(rd=0)
+    change = model.predict(with_rd) - model.predict(without_rd)
+    return (pl.DataFrame({by: data[by].to_list(), "ame_rd": change.to_list()})
+            .group_by(by).agg(pl.col("ame_rd").mean()).sort(by))
+
+ame_rd(m, df)
+```
+
+## Step 3: compare coefficients and marginal effects
+
+Separate logits per country, as in the warm-up:
+
+```{python}
+rows = []
+for country in ["DE", "HU"]:
+    part = df[df["country"] == country]
+    mc = smf.logit("exporter ~ rd + np.log(employees)", data=part).fit(disp=0)
+    rows.append({"country": country, "coef_rd": mc.params["rd"],
+                 "ame_rd_pp": 100 * mc.get_margeff(at="overall", dummy=True).margeff[0],
+                 "export_share": part["exporter"].mean()})
+compare = pl.DataFrame(rows)
+GT(compare).fmt_number(columns=["coef_rd", "ame_rd_pp"], decimals=2).fmt_percent(columns="export_share", decimals=0) \
+    .tab_header(title="R&D: coefficient vs marginal effect")
+```
+
+The coefficient says R&D matters more in Germany (0.80 vs 0.50). The marginal effect says the opposite: R&D raises the export probability by about 10 percentage points in Germany and 12 in Hungary. Two reasons: the coefficients are scaled by each country's unexplained variation (Layer 2 of the deck), and German SMEs already export at 84 %, where the S-curve is flat. Report the marginal effects.
+
+## Step 4: report predictions with confidence intervals
+
+The export probability of a typical SME, 50 employees, with R&D, in each country. `get_prediction()` gives the probability with a 95 % confidence interval.
+
+```{python}
+profiles = pl.DataFrame({"country": ["DE", "HU"], "employees": [50, 50], "rd": [1, 1]}).to_pandas()
+pred = m.get_prediction(profiles).summary_frame()
+GT(pl.from_pandas(profiles.join(pred[["predicted", "ci_lower", "ci_upper"]])))\
+    .fmt_percent(columns=["predicted", "ci_lower", "ci_upper"], decimals=1) \
+    .tab_header(title="Typical SME with R&D, 50 employees")
+```
+
+The curve a manager understands: predicted probability by firm size, with and without R&D, per country.
+
+```{python}
+grid = pl.DataFrame({"employees": np.tile(np.linspace(10, 249, 60).round(), 4),
+                     "rd": np.repeat([0, 1, 0, 1], 60),
+                     "country": np.repeat(["DE", "DE", "HU", "HU"], 60)}).to_pandas()
+grid = grid.join(m.get_prediction(grid).summary_frame()[["predicted", "ci_lower", "ci_upper"]])
+grid["group"] = grid["country"] + np.where(grid["rd"] == 1, ", with R&D", ", no R&D")
+
+(ggplot(grid, aes("employees", "predicted", color="group", fill="group"))
+ + geom_ribbon(aes(ymin="ci_lower", ymax="ci_upper"), alpha=0.15, color=None)
+ + geom_line(size=1)
+ + scale_y_continuous(labels=lambda v: [f"{x:.0%}" for x in v])
+ + labs(x="Employees", y="Predicted export probability", color="", fill=""))
+```
+
+## Step 5: an interaction on the probability scale
+
+Does R&D work differently in Hungary? The product term `rd:C(country)` is on the log-odds scale; the question is about probabilities (Ai & Norton 2003, Mize 2019).
+
+```{python}
+mi = smf.logit("exporter ~ rd * C(country, Treatment('DE')) + np.log(employees)", data=df).fit(disp=0)
+term = "rd:C(country, Treatment('DE'))[T.HU]"
+by_country = ame_rd(mi, df)
+second_difference = by_country["ame_rd"][1] - by_country["ame_rd"][0]
+print(f"product term: {mi.params[term]:+.3f} (p = {mi.pvalues[term]:.3f})")
+print(f"AME of R&D: DE {100 * by_country['ame_rd'][0]:.1f} pp, HU {100 * by_country['ame_rd'][1]:.1f} pp; "
+      f"second difference {100 * second_difference:+.1f} pp")
+```
+
+The product term is negative, but on the probability scale R&D helps Hungarian SMEs slightly more: the sign flips. Plot, test the marginal effects at each country, and compare them (second difference), never the product term alone.
+
+## Your turn
+
+1. **Fit**: the logit of Step 1.
+2. **Compute**: the AME of R&D overall and by country (Step 2).
+3. **Compare**: coefficients from separate country models with the marginal effects (Step 3). Which number would you put in a board memo, and why?
+4. **Report**: the export probability of a typical German and Hungarian SME, with confidence intervals (Step 4), and one plot with two sentences for a manager.
