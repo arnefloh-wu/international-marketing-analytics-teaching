@@ -9,780 +9,354 @@ execute:
   warning: false
 ---
 
-The Python version of the code slides and the in-class exercise of the logistic regression deck, with the packages of the course: polars, great_tables, statsmodels and plotnine. The data are simulated for a mobile operator (`data/churn/telco_churn.csv`, made by `data/generate_churn_data.py`, seed 33): 11,000 customers in Germany, Austria, Spain and Poland, and whether they cancelled within the next 12 months (churn). The true effects of the drivers are the same in every country, but the countries differ in their baseline churn, in the amount of unexplained variation (the scale) and in how customers use the satisfaction scale (response styles). The retention offer was randomised: a pilot in which half of the customers were picked at random.
+The code of the deck, in the deck's order. Steps 1–3 are the code on the Python slides (slides 28–30), character for character; Parts 1 and 3 carry the numbers of the deck's parts. The data are simulated for a mobile operator (`data/churn/telco_churn.csv`): 11,000 customers in Germany, Austria, Spain and Poland, and whether they cancelled within the next 12 months.
 
 | Column | Meaning |
 |---|---|
 | `customer_id` | customer number |
 | `country` | DE, AT, ES or PL |
 | `age` | age in years |
-| `tenure_months` | months as a customer |
-| `monthly` | 1 = month-to-month contract, 0 = 24-month contract |
-| `monthly_fee` | monthly fee in EUR |
+| `tenure_months` | months with the operator |
+| `monthly` | 1 = month-to-month contract, 0 = 24-month |
+| `monthly_fee` | fee in EUR per month |
 | `price_increase` | 1 = price rise in the last six months |
-| `complaints` | calls to the complaints line in the last six months |
+| `complaints` | complaint calls in the last six months |
 | `satisfaction` | survey score, 1 to 5 |
-| `retention_offer` | 1 = randomly picked for the pilot retention offer |
-| `churn` | 1 = left within the next 12 months |
+| `retention_offer` | 1 = got the retention offer (random pilot) |
+| `churn` | 1 = cancelled within the next 12 months |
 
-This file sits in `sessions/01-foundations/`, so it reads the data two folders up (`../../data/...`). Every number on the slides of the deck is printed somewhere below.
+## Step 0: packages and the churn formula
 
-## Step 0: load and look
+All packages of the session, and `FORMULA`, the churn formula with the four drivers used from Step 2 on.
 
 ```{python}
+# the packages of the session and the churn formula (Steps 1 and 2 import some of them again, as on the slides)
 import numpy as np
 import polars as pl
-import statsmodels.api as sm
 import statsmodels.formula.api as smf
 from great_tables import GT
-from plotnine import (aes, element_text, facet_wrap, geom_abline, geom_col, geom_errorbar,
-                      geom_hline, geom_line, geom_point, geom_ribbon, ggplot, labs,
-                      position_dodge, scale_color_manual, scale_fill_manual, scale_x_continuous,
-                      scale_x_discrete, scale_y_continuous, theme, theme_minimal)
+from plotnine import aes, geom_abline, geom_col, geom_errorbar, geom_hline, geom_line, ggplot, labs
+from scipy.stats import mannwhitneyu
+
+FORMULA = "churn ~ monthly + price_increase + complaints + np.log(tenure_months)"
+```
+
+## Step 1: load and look
+
+Our example, the data and a first look (slides 3–5 and 28). The file sits in `sessions/01-foundations/`, so it reads the data two folders up; `df` is the same data as a pandas table for statsmodels.
+
+```{python}
+import polars as pl
 
 churn = pl.read_csv("../../data/churn/telco_churn.csv")
 df = churn.to_pandas()
 
-FORMULA = "churn ~ monthly + price_increase + complaints + np.log(tenure_months)"
-COUNTRIES = ["DE", "AT", "ES", "PL"]
-COLOURS = {"DE": "#002350", "AT": "#8C8C8C", "ES": "#0096D3", "PL": "#7FB800"}
-percent = lambda v: [f"{x:.0%}" for x in v]          # axis labels in %
-
-overview = (churn.group_by("country", maintain_order=True)      # keeps the order DE, AT, ES, PL
-            .agg(pl.len().alias("customers"),
-                 pl.col("churn").mean().alias("churn_rate"),
-                 pl.col("monthly").mean().alias("share_month_to_month"),
-                 pl.col("satisfaction").mean().alias("mean_satisfaction"),
-                 pl.col("churn").filter(pl.col("monthly") == 1).mean()
-                 .alias("churn_month_to_month"),
-                 pl.col("churn").filter(pl.col("monthly") == 0).mean().alias("churn_24_month")))
-(GT(overview)
- .fmt_integer(columns="customers")
- .fmt_percent(columns=["churn_rate", "share_month_to_month", "churn_month_to_month",
-                       "churn_24_month"], decimals=1)
- .fmt_number(columns="mean_satisfaction", decimals=2)
- .tab_header(title="Customers by country", subtitle="Simulated data: telco_churn.csv"))
+overview = (churn
+    .group_by("country", maintain_order=True)
+    .agg(pl.col("churn").mean().alias("churn_rate"),
+         pl.col("churn").filter(pl.col("monthly") == 1)
+         .mean().alias("churn_month_to_month"),
+         pl.col("churn").filter(pl.col("monthly") == 0)
+         .mean().alias("churn_24_month")))
+overview
 ```
 
-Spanish (34.7 %) and Polish (28.5 %) customers churn about twice as often as German (15.4 %) and Austrian (14.6 %) ones, and in every country month-to-month customers churn far more often than customers on a 24-month contract. Spanish customers also give higher satisfaction scores (3.35 vs 2.96 in Germany), although they churn more: keep that in mind for Step 5.
-
-How to read it: the baselines differ a lot between the countries, and the baseline decides how many percentage points a coefficient is worth.
-
-## Step 1: odds, odds ratio and log-odds by hand
-
-The calculator examples of the slides, with invented round counts (not the data): in Germany 25 of 100 month-to-month customers and 10 of 100 customers on a 24-month contract churn; in Spain 45 of 100 and 25 of 100 (close to the data: 26 % vs 10 % and 47 % vs 25 %). The function below takes counts by country and contract and returns the probability, the odds and the log-odds, and then the ratios of month-to-month vs 24-month.
+Month-to-month customers churn two to three times as often, in every country: in Germany 26.4 % against 9.6 %, in Spain 46.6 % against 24.7 %.
 
 ```{python}
-def odds_table(counts):
-    """p, odds and log-odds by country and contract, and month-to-month vs 24-month."""
-    long = (counts.with_columns(p=pl.col("churners") / pl.col("customers"))
-            .with_columns(odds=pl.col("p") / (1 - pl.col("p")))
-            .with_columns(log_odds=pl.col("odds").log()))
-    wide = long.pivot(on="monthly", index="country", values=["p", "odds", "log_odds"])
-    ratios = wide.select("country",
-                         ((pl.col("p_1") - pl.col("p_0")) * 100).alias("gap_pp"),
-                         (pl.col("p_1") / pl.col("p_0")).alias("risk_ratio"),
-                         (pl.col("odds_1") / pl.col("odds_0")).alias("odds_ratio"),
-                         (pl.col("log_odds_1") - pl.col("log_odds_0")).alias("log_odds_diff"))
-    return long, ratios
+# slides 3 and 4: customers per country, and one row of the data (customer 47)
+print(churn.group_by("country", maintain_order=True).len())
+churn.filter(pl.col("customer_id") == 47)
+```
 
+## Part 1: from churn rates to odds
 
-calculator = pl.DataFrame({"country": ["DE", "DE", "ES", "ES"], "monthly": [1, 0, 1, 0],
-                           "customers": [100, 100, 100, 100], "churners": [25, 10, 45, 25]})
-long, ratios = odds_table(calculator)
-GT(long).fmt_number(columns=["p", "odds"], decimals=4).fmt_number(columns="log_odds", decimals=3) \
-    .tab_header(title="Calculator example: invented counts", subtitle="monthly = 1: month-to-month")
+Why not ordinary regression? A straight line has no limits, the S-curve of the logit stays between 0 and 100 % (slide 7).
+
+```{python}
+# slide 7: a straight line (ordinary regression) and an S-curve (logit) of churn on complaint calls
+line = smf.ols("churn ~ complaints", data=df).fit()
+curve = smf.logit("churn ~ complaints", data=df).fit(disp=0)
+ten_calls = pl.DataFrame({"complaints": [10]}).to_pandas()
+print("straight line: +", round(100 * line.params["complaints"], 1), "pp per complaint call")
+print("churn at 10 calls: straight line", round(100 * line.predict(ten_calls)[0]), "%,",
+      "S-curve", round(100 * curve.predict(ten_calls)[0]), "%")
+```
+
+The calculator examples with invented round counts: 25 of 100 month-to-month (`mtm`) and 10 of 100 24-month (`24m`) customers churn in Germany (slide 8), 45 and 25 in Spain (slide 12). Odds = p / (1 − p), churners per stayer.
+
+```{python}
+# slides 8 and 12: probability, odds and log-odds of both contract groups
+calc = pl.DataFrame({"country": ["DE", "ES"], "churners_mtm": [25, 45], "churners_24m": [10, 25]})
+calc = calc.with_columns(p_mtm=pl.col("churners_mtm") / 100, p_24m=pl.col("churners_24m") / 100)
+calc = calc.with_columns(odds_mtm=pl.col("p_mtm") / (1 - pl.col("p_mtm")),
+                         odds_24m=pl.col("p_24m") / (1 - pl.col("p_24m")))
+calc = calc.with_columns(log_odds_mtm=pl.col("odds_mtm").log(), log_odds_24m=pl.col("odds_24m").log())
+calc
 ```
 
 ```{python}
-GT(ratios).fmt_number(columns=["gap_pp"], decimals=1) \
-    .fmt_number(columns=["risk_ratio", "odds_ratio"], decimals=2) \
-    .fmt_number(columns="log_odds_diff", decimals=3) \
-    .tab_header(title="Month-to-month vs 24-month: invented counts")
+# slide 9: odds ratio, difference in log-odds (= ln of the odds ratio), risk ratio and gap in pp
+calc.select("country",
+            odds_ratio=pl.col("odds_mtm") / pl.col("odds_24m"),
+            log_odds_diff=pl.col("log_odds_mtm") - pl.col("log_odds_24m"),
+            risk_ratio=pl.col("p_mtm") / pl.col("p_24m"),
+            gap_pp=100 * (pl.col("p_mtm") - pl.col("p_24m")))
 ```
 
-Germany has the larger odds ratio (3.0 vs 2.45), Spain the larger gap in percentage points (pp: 20 vs 15); the risk ratios are 2.5 and 1.8. The two scales rank the countries differently, the puzzle of Part 3 of the deck. The difference of the log-odds (1.099 and 0.898) is the log of the odds ratio. A logit with `monthly` alone returns exactly these numbers: the intercept is the log-odds of the 24-month customers, the coefficient the difference of the log-odds. To check, we build the 200 customers of each country from the counts.
+Germany: odds ratio 3.0 (the contract triples the odds), log-odds difference 1.10 = ln 3, but churn is "only" 2.5 times as likely, +15 pp. Spain: odds ratio 2.45 (2.48 from the rounded odds 0.82 / 0.33), but +20 pp: the two scales rank the countries differently, the puzzle of Part 3. A logit on the 200 German customers gives the same numbers:
 
 ```{python}
-def from_counts(churners_monthly, churners_24_month, n=100):
-    """n month-to-month and n 24-month customers with the given numbers of churners."""
-    return pl.DataFrame({
-        "monthly": [1] * n + [0] * n,
-        "churn": ([1] * churners_monthly + [0] * (n - churners_monthly)
-                  + [1] * churners_24_month + [0] * (n - churners_24_month))}).to_pandas()
-
-
-de = from_counts(25, 10)
-es = from_counts(45, 25)
-smf.logit("churn ~ monthly", data=es).fit().params
+# slide 9: a logit of churn on the contract for the 200 German customers of slide 8
+german = pl.DataFrame({"monthly": [1] * 100 + [0] * 100,
+                       "churn": [1] * 25 + [0] * 75 + [1] * 10 + [0] * 90})
+smf.logit("churn ~ monthly", data=german.to_pandas()).fit(disp=0).params
 ```
 
+The intercept is the log-odds of the 24-month group (−2.20), the coefficient the step to month-to-month (+1.10): on the S-curve of slide 10 that is 10 % → 25 %. The same odds ratio adds different percentage points at different starting rates:
+
 ```{python}
-smf.logit("churn ~ monthly", data=de).fit().params
+# slide 11: an odds ratio of 2 at five starting churn rates p0; p1 = OR·p0 / (1 − p0 + OR·p0)
+or2 = pl.DataFrame({"p0": [0.05, 0.15, 0.35, 0.50, 0.90]})
+or2 = or2.with_columns(p1=2 * pl.col("p0") / (1 - pl.col("p0") + 2 * pl.col("p0")))
+or2.with_columns(change_pp=100 * (pl.col("p1") - pl.col("p0")), times=pl.col("p1") / pl.col("p0"))
 ```
 
-`.fit()` prints a short message on the optimisation; `.fit(disp=0)` silences it, which we do from now on. The same table for the real data of Germany and Spain:
+"Twice as likely" only holds for rare outcomes: 5 % → 9.5 %, but 35 % → 51.9 % is 1.5 times and +16.9 pp.
+
+## Step 2: fit the logit and the marginal effects
+
+Part 2, the churn logit (slides 14, 15 and 29). First the two things the slide code uses: `ame()`, which predicts every customer once with `var` = 1 and once with 0 and averages the difference by country, and the profile of slide 15.
 
 ```{python}
-real_counts = (churn.filter(pl.col("country").is_in(["DE", "ES"]))
-               .group_by("country", "monthly")
-               .agg(pl.len().alias("customers"), pl.col("churn").sum().alias("churners"))
-               .sort("country", "monthly", descending=[False, True]))
-real_long, real_ratios = odds_table(real_counts)
-GT(real_long).fmt_percent(columns="p", decimals=1) \
-    .fmt_number(columns=["odds", "log_odds"], decimals=3) \
-    .tab_header(title="Real data: Germany and Spain", subtitle="Simulated data: telco_churn.csv")
-```
-
-```{python}
-GT(real_ratios).fmt_number(columns="gap_pp", decimals=1) \
-    .fmt_number(columns=["risk_ratio", "odds_ratio", "log_odds_diff"], decimals=2)
-```
-
-How to read it: in the data, month-to-month customers churn at 26.4 % vs 9.6 % in Germany and at 46.6 % vs 24.7 % in Spain; the odds ratio is larger in Germany, the gap in percentage points larger in Spain, so the two measures can rank the countries differently.
-
-## Step 2: pooled logit with country dummies
-
-One model for all four countries with country dummies (Germany as reference). We first define a helper for average marginal effects by group (Step 3 uses it): predict every customer twice, once with `var` set to 1 and once with 0, and average the difference within each country. It is the Python version of `avg_comparisons(..., by = "country")` in R's marginaleffects.
-
-```{python}
-def ame(model, data, var, by="country"):
-    """Average change in the churn probability from var = 0 to var = 1, by group."""
+# the helper ame() and the profile: month-to-month, price rise, one complaint call, 12 months, in each country
+def ame(model, data, var):
+    """Average change in the churn probability when var goes from 0 to 1, by country."""
     change = model.predict(data.assign(**{var: 1})) - model.predict(data.assign(**{var: 0}))
-    return change.groupby(data[by]).mean()
+    return change.groupby(data["country"]).mean()
+
+
+profiles = pl.DataFrame({"country": ["DE", "AT", "ES", "PL"], "monthly": 1, "price_increase": 1,
+                         "complaints": 1, "tenure_months": 12}).to_pandas()
 ```
 
-The model of slide 36. `smf.logit` works like `smf.ols`; the coefficients are on the log-odds scale.
+The slide code: one logit for all customers with country dummies, Germany as reference. A chunk shows only its last line, the predicted churn of the profile: 35.1 % in Germany, 60.9 % in Spain.
 
 ```{python}
+import numpy as np
+import statsmodels.formula.api as smf
+
 m = smf.logit(
     "churn ~ monthly + price_increase"
     " + complaints + np.log(tenure_months)"
     " + C(country, Treatment('DE'))",
     data=df).fit()
-```
 
-Coefficients, odds ratios (`exp(b)`) and p-values in one table. `print(m.summary())` gives the full statsmodels table with standard errors.
-
-```{python}
-coefs = pl.DataFrame({"term": m.params.index.to_list(), "coefficient": m.params.to_list(),
-                      "odds_ratio": np.exp(m.params).to_list(),
-                      "p": ["< 0.001" if v < 0.001 else f"{v:.3f}" for v in m.pvalues]})
-(GT(coefs)
- .fmt_number(columns="coefficient", decimals=3)
- .fmt_number(columns="odds_ratio", decimals=2)
- .tab_header(title="Pooled churn logit with country dummies", subtitle="Reference: Germany")
- .tab_source_note(f"McFadden pseudo-R²: {m.prsquared:.3f}; n = {int(m.nobs):,}"))
-```
-
-The odds ratio of `np.log(tenure_months)` refers to a change of one in the log of tenure, which is hard to read. Doubling tenure raises the log by ln 2, so it multiplies the odds by 2 to the power of the coefficient:
-
-```{python}
-b_tenure = m.params["np.log(tenure_months)"]
-print(f"doubling tenure multiplies the odds of churn by {2 ** b_tenure:.2f}")
-```
-
-How to read it: a month-to-month contract multiplies the odds of churn by 2.62, each complaint call by 1.57 and a price rise by 1.83; Spain's 2.88 and Poland's 1.86 are differences in the baseline, not drivers, and Austria does not differ from Germany (p = 0.907).
-
-## Step 3: average marginal effects by country
-
-`get_margeff()` gives the average marginal effects (AMEs): the average change in the churn probability. `dummy=True` treats the 0/1 variables (`monthly`, `price_increase`) as switches from 0 to 1 instead of slopes.
-
-```{python}
 m.get_margeff(dummy=True).summary()
-```
-
-The AME of the month-to-month contract by country, with the helper of Step 2:
-
-```{python}
 ame(m, df, "monthly")    # by country
-```
-
-The same in percentage points, next to each country's churn rate:
-
-```{python}
-ame_pooled = ame(m, df, "monthly")
-ame_table = overview.select("country", "churn_rate").with_columns(
-    ame_monthly_pp=pl.Series([100 * ame_pooled[country] for country in COUNTRIES]))
-GT(ame_table).fmt_percent(columns="churn_rate", decimals=1) \
-    .fmt_number(columns="ame_monthly_pp", decimals=2) \
-    .tab_header(title="Month-to-month contract: AME by country", subtitle="Pooled model of Step 2")
-```
-
-The pooled model has one coefficient for the contract (0.962), the same in all four countries. Its AME still differs: 12.40 pp in Germany, 12.29 pp in Austria, 20.11 pp in Spain and 17.31 pp in Poland, because the same change in log-odds moves the probability more when the baseline is closer to 50 %, where the S-curve is steep.
-
-How to read it: report the effect of a driver in percentage points by country, not as one coefficient; with different baselines one coefficient means different effects. But the pooled model forces one slope on all countries, and with different logit scales that overstates the gap between countries (here 12.4 vs 20.1 pp; the true effects, from a large simulation, are about 16.7 and 17.6 pp). For a comparison, use country-specific slopes: separate logits (Step 4) or the interaction model (Step 6).
-
-## Step 4: separate country logits: the warm-up
-
-One logit per country, with the churn formula. The AME of `monthly` is the first entry of `margeff`.
-
-```{python}
-rows = []
-for country in COUNTRIES:
-    part = df[df["country"] == country]
-    m_c = smf.logit(FORMULA, data=part).fit(disp=0)
-    rows.append({"country": country, "coef_monthly": m_c.params["monthly"],
-                 "odds_ratio": np.exp(m_c.params["monthly"]),
-                 "ame_monthly_pp": 100 * m_c.get_margeff(at="overall", dummy=True).margeff[0],
-                 "churn_rate": part["churn"].mean()})
-flip = pl.DataFrame(rows).with_columns(
-    rank_coef=pl.col("coef_monthly").rank(descending=True).cast(pl.Int64),
-    rank_ame=pl.col("ame_monthly_pp").rank(descending=True).cast(pl.Int64))
-(GT(flip)
- .fmt_number(columns="coef_monthly", decimals=3)
- .fmt_number(columns=["odds_ratio", "ame_monthly_pp"], decimals=2)
- .fmt_percent(columns="churn_rate", decimals=1)
- .tab_header(title="Month-to-month contract: coefficient vs AME",
-             subtitle="Separate country logits"))
-```
-
-```{python}
-flip_long = (flip.unpivot(index="country", on=["coef_monthly", "ame_monthly_pp"],
-                          variable_name="measure", value_name="value")
-             .with_columns(pl.col("measure").replace({"coef_monthly": "Coefficient (log-odds)",
-                                                      "ame_monthly_pp": "AME (pp)"})
-                          .cast(pl.Enum(["Coefficient (log-odds)", "AME (pp)"]))))
-(ggplot(flip_long.to_pandas(), aes("country", "value", fill="country"))
- + geom_col(width=0.7)
- + facet_wrap("~measure", scales="free_y")
- + scale_x_discrete(limits=COUNTRIES)
- + scale_fill_manual(values=COLOURS, guide=None)
- + labs(x="", y="")
- + theme_minimal()
- + theme(figure_size=(8, 3.5)))
-```
-
-Is the Germany–Spain gap larger than sampling error? A z test for the difference of two independent estimates, once for the coefficients and once for the AMEs (standard errors from `bse` and `margeff_se`):
-
-```{python}
-est = {}
-for country in ["DE", "ES"]:
-    m_c = smf.logit(FORMULA, data=df[df["country"] == country]).fit(disp=0)
-    me = m_c.get_margeff(at="overall", dummy=True)
-    est[country] = {"coef": (m_c.params["monthly"], m_c.bse["monthly"]),
-                    "ame": (100 * me.margeff[0], 100 * me.margeff_se[0])}
-for measure in ["coef", "ame"]:
-    (b_de, se_de), (b_es, se_es) = est["DE"][measure], est["ES"][measure]
-    diff, se = b_es - b_de, np.hypot(se_de, se_es)
-    print(f"{measure}: Spain - Germany = {diff:+.3f}, z = {diff / se:+.2f}, "
-          f"95 % CI [{diff - 1.96 * se:+.2f}, {diff + 1.96 * se:+.2f}]")
-```
-
-How to read it: the coefficients put Germany first (1.189) and Spain last (0.810), a gap of 0.38 that is clearly significant (z about 2.8); the AMEs put Spain first (17.29 pp) and Austria last (12.33 pp), but the Germany–Spain gap of 2.1 pp is within sampling error (z about 0.9). The generator sets the same true effect (1.3) everywhere, but the scale of the unexplained variation is 1.0 in Germany and Austria, 1.5 in Spain and 1.2 in Poland, and a logit coefficient is the true effect divided by the scale: the German lead in coefficients disappears on the probability scale.
-
-## Step 5: satisfaction and response styles
-
-How customers use the 1-to-5 scale, by country:
-
-```{python}
-answers = (churn.group_by("country", "satisfaction", maintain_order=True).agg(pl.len().alias("n"))
-           .with_columns(share=pl.col("n") / pl.col("n").sum().over("country")))
-answer_table = (answers.pivot(on="satisfaction", index="country", values="share", sort_columns=True)
-                .join(overview.select("country", "mean_satisfaction"), on="country"))
-GT(answer_table).fmt_percent(columns=["1", "2", "3", "4", "5"], decimals=1) \
-    .fmt_number(columns="mean_satisfaction", decimals=2) \
-    .tab_header(title="Share of answers by satisfaction score", subtitle="Rows add up to 100 %")
-```
-
-```{python}
-(ggplot(answers.with_columns(pl.col("country").cast(pl.Enum(COUNTRIES))).to_pandas(),
-        aes("factor(satisfaction)", "share", fill="country"))
- + geom_col(position=position_dodge(width=0.8), width=0.75)
- + scale_fill_manual(values=COLOURS, breaks=COUNTRIES)
- + scale_y_continuous(labels=percent)
- + labs(x="Satisfaction score", y="Share of answers", fill="")
- + theme_minimal()
- + theme(figure_size=(8, 3.5)))
-```
-
-Only 4.0 % of German customers answer 5, but 20.3 % of Spanish customers do; the mean is 2.96 in Germany and 3.35 in Spain. Spanish respondents use the top of the scale more (acquiescence and extreme responding), so the same score does not mean the same satisfaction. Now the separate logits with satisfaction added, once with the raw score and once with the score standardised within each country (a z-score with polars `over("country")`):
-
-```{python}
-churn_z = churn.with_columns(
-    sat_z=((pl.col("satisfaction") - pl.col("satisfaction").mean())
-           / pl.col("satisfaction").std()).over("country"))
-df_z = churn_z.to_pandas()
-
-rows = []
-for country in COUNTRIES:
-    part = df_z[df_z["country"] == country]
-    raw = smf.logit(FORMULA + " + satisfaction", data=part).fit(disp=0)
-    std = smf.logit(FORMULA + " + sat_z", data=part).fit(disp=0)
-    rows.append({"country": country, "sd_satisfaction": part["satisfaction"].std(),
-                 "coef_satisfaction": raw.params["satisfaction"], "coef_sat_z": std.params["sat_z"],
-                 "coef_monthly": std.params["monthly"]})
-GT(pl.DataFrame(rows)).fmt_number(columns="sd_satisfaction", decimals=2) \
-    .fmt_number(columns=["coef_satisfaction", "coef_sat_z", "coef_monthly"], decimals=3) \
-    .tab_header(title="Satisfaction in separate country logits",
-                subtitle="coef_sat_z: per standard deviation within the country")
-```
-
-The raw satisfaction coefficient is −0.470 in Germany, −0.557 in Austria, −0.259 in Spain and −0.376 in Poland. Within one country a z-score is only a linear rescaling: the coefficient per standard deviation is the raw coefficient times that country's standard deviation, and the other coefficients (here `monthly`) do not change. The z-score removes differences in the centre and spread of the response style, so "one standard deviation more satisfied" means the same position within each country; it does not remove the logit scale of Step 4, so the coefficients of the countries are still not directly comparable.
-
-How to read it: compare satisfaction across countries only after dealing with response styles (z-scores within country, anchoring vignettes or measurement invariance tests), and still compare effects in percentage points.
-
-## Step 6: interaction and second difference
-
-Does the contract matter more in Spain? The interaction model lets the contract coefficient differ by country.
-
-```{python}
-inter = smf.logit("churn ~ monthly * C(country, Treatment('DE')) + price_increase + complaints"
-                  " + np.log(tenure_months)", data=df).fit(disp=0)
-term = "monthly:C(country, Treatment('DE'))[T.ES]"
-ame_inter = ame(inter, df, "monthly")
-print(f"product term month-to-month x Spain: {inter.params[term]:.3f} "
-      f"(p = {inter.pvalues[term]:.3f})")
-print(f"AME of month-to-month: DE {100 * ame_inter['DE']:.2f} pp, "
-      f"ES {100 * ame_inter['ES']:.2f} pp; "
-      f"second difference {100 * (ame_inter['ES'] - ame_inter['DE']):+.2f} pp")
-```
-
-The average predictions behind the chart of slide 35: every customer of a country predicted with `monthly` set to 0 and to 1.
-
-```{python}
-avg_pred = pl.DataFrame({
-    "country": df["country"].to_list(),
-    "pred_24_month": inter.predict(df.assign(monthly=0)).to_list(),
-    "pred_month_to_month": inter.predict(df.assign(monthly=1)).to_list(),
-}).group_by("country", maintain_order=True).mean()
-GT(avg_pred.with_columns(ame_pp=100 * (pl.col("pred_month_to_month") - pl.col("pred_24_month")))) \
-    .fmt_percent(columns=["pred_24_month", "pred_month_to_month"], decimals=1) \
-    .fmt_number(columns="ame_pp", decimals=2) \
-    .tab_header(title="Average predicted churn by contract", subtitle="Interaction model")
-```
-
-A 95 % confidence interval for the second difference with the bootstrap: draw customers with replacement within each country, refit, recompute. With 200 resamples this takes a few seconds.
-
-```{python}
-def second_difference(data):
-    """AME of month-to-month in Spain minus Germany, from the interaction model."""
-    fit_b = smf.logit("churn ~ monthly * C(country, Treatment('DE')) + price_increase + complaints"
-                      " + np.log(tenure_months)", data=data).fit(disp=0)
-    a = ame(fit_b, data, "monthly")
-    return a["ES"] - a["DE"]
-
-
-boot_rng = np.random.default_rng(2026)
-rows_by_country = [np.flatnonzero(df["country"].to_numpy() == country) for country in COUNTRIES]
-draws = []
-for _ in range(200):
-    idx = np.concatenate([boot_rng.choice(r, size=len(r)) for r in rows_by_country])
-    draws.append(second_difference(df.iloc[idx].reset_index(drop=True)))
-low, high = 100 * np.percentile(draws, [2.5, 97.5])
-print(f"second difference {100 * second_difference(df):+.2f} pp, "
-      f"bootstrap 95 % CI [{low:+.2f}, {high:+.2f}] pp")
-```
-
-How to read it: the product term is negative (−0.245, p = 0.047) and says "the contract matters less in Spain", but on the probability scale the contract raises churn by 17.93 pp in Spain and 14.16 pp in Germany, a second difference of +3.77 pp; plot, compute the AMEs, compare them, and do not interpret the product term alone (Ai & Norton 2003, Mize 2019). The bootstrap interval of the second difference includes zero, so the data show clearly that the product term misleads about the sign, but only weakly that the contract matters more in Spain.
-
-## Step 7: predictions with confidence intervals and a plotnine curve
-
-The churn probability of a typical profile in each country: month-to-month, a price rise, one complaint call, 12 months of tenure. `get_prediction()` gives the probability with a 95 % confidence interval.
-
-```{python}
-profiles = pl.DataFrame({"country": COUNTRIES, "monthly": [1] * 4, "price_increase": [1] * 4,
-                         "complaints": [1] * 4, "tenure_months": [12] * 4}).to_pandas()
 m.get_prediction(profiles).summary_frame()
 ```
 
+Reading the table (slide 14): above 1 raises the odds, below 1 lowers them.
+
 ```{python}
-pred = m.get_prediction(profiles).summary_frame()
-profile_table = pl.DataFrame({"country": COUNTRIES, "predicted": pred["predicted"].to_list(),
-                              "ci_lower": pred["ci_lower"].to_list(),
-                              "ci_upper": pred["ci_upper"].to_list()})
-GT(profile_table).fmt_number(columns=["predicted", "ci_lower", "ci_upper"], decimals=3) \
-    .tab_header(title="Predicted churn probability with 95 % CI",
-                subtitle="Month-to-month, price rise, one complaint call, 12 months tenure")
+# slide 14: coefficients (log-odds), odds ratios = np.exp(coefficient), p-values
+terms = pl.DataFrame({"term": m.params.index.to_list(), "coefficient": m.params.to_list(),
+                      "odds_ratio": np.exp(m.params).to_list(), "p_value": m.pvalues.to_list()})
+GT(terms).fmt_number(columns=["coefficient", "p_value"], decimals=3).fmt_number(columns="odds_ratio", decimals=2)
 ```
 
-The curve a manager understands: predicted churn by tenure for the same profile, per country.
+Month-to-month multiplies the odds of churn by 2.62, each complaint call by 1.57 (+57 %); Spain's 2.88 is a higher baseline, not a driver, and Austria does not differ from Germany (p = 0.907).
 
 ```{python}
-grid = pl.DataFrame({"country": np.repeat(COUNTRIES, 60),
-                     "tenure_months": np.tile(np.arange(1, 61), 4),
-                     "monthly": np.ones(240, dtype=int), "price_increase": np.ones(240, dtype=int),
-                     "complaints": np.ones(240, dtype=int)}).to_pandas()
-grid = grid.join(m.get_prediction(grid).summary_frame()[["predicted", "ci_lower", "ci_upper"]])
-
-(ggplot(grid, aes("tenure_months", "predicted", color="country", fill="country"))
- + geom_ribbon(aes(ymin="ci_lower", ymax="ci_upper"), alpha=0.15, color=None)
- + geom_line(size=1)
- + scale_color_manual(values=COLOURS, breaks=COUNTRIES)
- + scale_fill_manual(values=COLOURS, breaks=COUNTRIES)
- + scale_y_continuous(labels=percent)
- + labs(x="Tenure (months)", y="Predicted churn probability", color="", fill="",
-        title="Month-to-month, price rise, one complaint call")
- + theme_minimal()
- + theme(figure_size=(7, 4)))
+# the two lines of the slide code that are not displayed: the AMEs over all customers, then by country (in pp)
+print(m.get_margeff(dummy=True).summary())
+print(100 * ame(m, df, "monthly"))
 ```
 
-How to read it: the same customer profile has a churn probability of 35.1 % [32.4, 37.9] in Germany and 60.9 % [58.1, 63.6] in Spain; churn falls with tenure, fastest in the first year.
-
-The pooled model forces one contract slope on all countries, which widens the gap between countries (Step 3). The same profile from the separate country models of Step 4 (country-specific slopes), the numbers on slides 30 and 33:
+The AME of month-to-month is 0.156: +15.6 pp on average (95 % CI 13.8 to 17.4). By country the one coefficient gives 12.4 pp in Germany and 20.1 pp in Spain, because the pooled model forces one slope on all countries; compare countries with country models (Part 3). The prediction of slide 15 comes from such models:
 
 ```{python}
+# slide 15: the same profile from a logit for German customers only and one for Spanish customers only
+m_de = smf.logit(FORMULA, data=churn.filter(pl.col("country") == "DE").to_pandas()).fit(disp=0)
+m_es = smf.logit(FORMULA, data=churn.filter(pl.col("country") == "ES").to_pandas()).fit(disp=0)
+print(m_de.get_prediction(profiles).summary_frame().loc[0])    # row 0 of profiles: Germany
+print(m_es.get_prediction(profiles).summary_frame().loc[2])    # row 2 of profiles: Spain
+```
+
+Three numbers to report: the odds ratio (2.62), the AME in pp (+15.6) and a predicted probability with its CI (DE 38.1 % [34.1, 42.2], ES 58.0 % [54.0, 62.0]).
+
+## Part 3: comparing countries
+
+One logit per country with the churn formula (slides 17–19). `get_margeff` lists `monthly` by name, so we pick it with `.loc`.
+
+```{python}
+# one logit per country: the month-to-month coefficient and AME (in pp), with standard errors
 rows = []
-for country in COUNTRIES:
-    m_c = smf.logit(FORMULA, data=df[df["country"] == country]).fit(disp=0)
-    pr = m_c.get_prediction(profiles[profiles["country"] == country]).summary_frame().iloc[0]
-    rows.append({"country": country, "predicted": pr["predicted"],
-                 "ci_lower": pr["ci_lower"], "ci_upper": pr["ci_upper"]})
-GT(pl.DataFrame(rows)).fmt_number(columns=["predicted", "ci_lower", "ci_upper"], decimals=3) \
-    .tab_header(title="Predicted churn probability with 95 % CI", subtitle="Separate country models")
+for country in ["DE", "AT", "ES", "PL"]:
+    m_c = smf.logit(FORMULA, data=churn.filter(pl.col("country") == country).to_pandas()).fit(disp=0)
+    me = m_c.get_margeff(at="overall", dummy=True).summary_frame()
+    rows.append({"country": country, "coef": m_c.params["monthly"], "se": m_c.bse["monthly"],
+                 "odds_ratio": np.exp(m_c.params["monthly"]),
+                 "ame_pp": 100 * me.loc["monthly", "dy/dx"], "ame_se_pp": 100 * me.loc["monthly", "Std. Err."]})
+countries = pl.DataFrame(rows)
+countries
 ```
 
-With country-specific slopes the profile churns at 38.1 % [34.1, 42.2] in Germany and 58.0 % [54.0, 62.0] in Spain: still a large gap, because the Spanish baseline is higher, but narrower than in the pooled model.
-
-## Step 8: train/test split and the confusion matrix
-
-A churn model is judged on customers it has not seen. We fit on a random 70 % of the customers and score the other 30 % (seed 1), with the churn formula plus satisfaction and country dummies.
+The coefficients put Germany first (1.19) and Spain last (0.81), the AMEs put Spain first (17.3 pp vs 15.2 pp). The true effect is 1.3 everywhere (simulation), but a coefficient is about the true effect divided by the noise scale: 1.3 / 1.0 in Germany, 1.3 / 1.5 ≈ 0.87 in Spain. Is either gap larger than sampling error?
 
 ```{python}
+# slides 18 and 19: z test for the gap between Germany and Spain, on both scales
+de, es = countries.row(0, named=True), countries.row(2, named=True)
+gap_coef, se_coef = de["coef"] - es["coef"], (de["se"] ** 2 + es["se"] ** 2) ** 0.5
+gap_ame, se_ame = es["ame_pp"] - de["ame_pp"], (de["ame_se_pp"] ** 2 + es["ame_se_pp"] ** 2) ** 0.5
+print("coefficient, Germany - Spain:", round(gap_coef, 2), " z =", round(gap_coef / se_coef, 1))
+print("AME in pp, Spain - Germany:", round(gap_ame, 1), " z =", round(gap_ame / se_ame, 1),
+      " 95 % CI", round(gap_ame - 1.96 * se_ame, 1), "to", round(gap_ame + 1.96 * se_ame, 1))
+```
+
+The naive test calls the coefficient gap significant (z = 2.8); on the probability scale the gap disappears (2.1 pp, z = 0.9). Compare countries in percentage points. Survey scores need the same care (slide 20):
+
+```{python}
+# slide 20: mean satisfaction score and share of customers who give a 5, by country
+churn.group_by("country", maintain_order=True).agg(
+    mean_score=pl.col("satisfaction").mean(),
+    share_5=(pl.col("satisfaction") == 5).mean())
+```
+
+20.3 % give a 5 in Spain, 4.0 % in Germany (mean 3.35 vs 2.96), although true satisfaction is equal in the simulation: standardise the scores within each country (z-scores, `.over("country")` in polars) before you pool them.
+
+Interactions, read in percentage points (slide 21): one logit with contract × country.
+
+```{python}
+# slide 21: the product term month-to-month × Spain, and average predicted churn by contract and country
+INTER = "churn ~ monthly * C(country, Treatment('DE')) + price_increase + complaints + np.log(tenure_months)"
+inter = smf.logit(INTER, data=df).fit(disp=0)
+term = "monthly:C(country, Treatment('DE'))[T.ES]"
+print("product term:", round(inter.params[term], 3), " p =", round(inter.pvalues[term], 3))
+avg = churn.select("country").with_columns(
+    p_24_month=inter.predict(churn.with_columns(monthly=0).to_pandas()).to_numpy(),
+    p_month_to_month=inter.predict(churn.with_columns(monthly=1).to_pandas()).to_numpy())
+avg = avg.group_by("country", maintain_order=True).mean()
+avg.with_columns(ame_pp=100 * (pl.col("p_month_to_month") - pl.col("p_24_month")))
+```
+
+The product term (−0.245) says "weaker in Spain", but in pp the contract adds 17.93 in Spain (26.3 % → 44.2 %) and 14.16 in Germany (10.2 % → 24.3 %). Is the difference of +3.8 pp clear? A bootstrap: draw customers with replacement within each country, refit, recompute, 200 times (a few seconds).
+
+```{python}
+# the second difference (Spain minus Germany, in pp) and its 95 % bootstrap CI
+rng = np.random.default_rng(2026)
+rows_by_country = [np.flatnonzero(df["country"] == c) for c in ["DE", "AT", "ES", "PL"]]
+draws = []
+for _ in range(200):
+    sample = churn[np.concatenate([rng.choice(r, size=len(r)) for r in rows_by_country])].to_pandas()
+    a = ame(smf.logit(INTER, data=sample).fit(disp=0), sample, "monthly")
+    draws.append(100 * (a["ES"] - a["DE"]))
+a = ame(inter, df, "monthly")
+print("second difference:", round(100 * (a["ES"] - a["DE"]), 2), "pp")
+print("95 % bootstrap CI:", np.percentile(draws, [2.5, 97.5]).round(1))
+```
+
+The interval (−0.7 to +7.2 pp) includes zero: no clear difference, and certainly not weaker in Spain.
+
+## Step 3: evaluate the model
+
+Part 4, using a churn model (slides 23, 24 and 30). The slide code fits the model on a random 70 % of the customers and predicts the other 30 %, then takes the top decile.
+
+```{python}
+# FORMULA: the churn formula of Step 2 (qmd Step 0)
 rng = np.random.default_rng(1)
 test = rng.random(len(df)) < 0.3
 fit = smf.logit(FORMULA + " + satisfaction + C(country)",
                 data=df[~test]).fit()
 p = fit.predict(df[test]).to_numpy()
 y = df.loc[test, "churn"].to_numpy()
-print(f"{test.sum():,} test customers, churn rate {y.mean():.3f}")
-```
 
-The confusion matrix flags a customer when the predicted churn probability is at or above a threshold. We compare 0.5, 0.3 and the churn rate of the training customers.
-
-```{python}
-def confusion(y, p, threshold):
-    """Confusion matrix and the usual rates at one threshold."""
-    flag = p >= threshold
-    tp, fp = (flag & (y == 1)).sum(), (flag & (y == 0)).sum()
-    fn, tn = (~flag & (y == 1)).sum(), (~flag & (y == 0)).sum()
-    return {"threshold": float(threshold),
-            "TP": int(tp), "FP": int(fp), "FN": int(fn), "TN": int(tn),
-            "accuracy": (tp + tn) / len(y), "recall": tp / (tp + fn),
-            "precision": tp / (tp + fp), "share_flagged": flag.mean()}
-
-
-base_rate = df.loc[~test, "churn"].mean()
-thresholds = pl.DataFrame([confusion(y, p, t) for t in [0.5, 0.3, base_rate]])
-print(f"accuracy of 'nobody churns': {1 - y.mean():.3f}")
-GT(thresholds).fmt_number(columns="threshold", decimals=3) \
-    .fmt_integer(columns=["TP", "FP", "FN", "TN"]) \
-    .fmt_number(columns=["accuracy", "recall", "precision", "share_flagged"], decimals=3) \
-    .tab_header(title="Confusion matrix on the test customers",
-                subtitle="Third row: threshold = churn rate of the training customers")
-```
-
-At 0.5 the model flags 8.6 % of the customers and catches 22 % of the churners (recall 0.220, precision 0.623); its accuracy of 0.779 is barely above the 0.758 of predicting "nobody churns". Lower thresholds catch more churners at the price of more false alarms; the right threshold follows from the costs (Step 11). A random split is the minimum: a churn model is used next quarter, so out-of-time validation (fit on earlier months, score later ones) is better practice. These data have no snapshot months, so we use the random split.
-
-How to read it: accuracy is the wrong yardstick for churn; look at recall, precision and the share flagged at the threshold you would use.
-
-## Step 9: AUC, Gini, top-decile lift and gains chart
-
-Ranking quality without a threshold. The AUC is the probability that a random churner gets a higher predicted probability than a random stayer; the rank formula (Mann-Whitney) computes it in three lines.
-
-```{python}
-def lift_auc(y, p, top=0.1):
-    """Top-decile lift and AUC (rank formula)."""
-    order = np.argsort(-p)
-    k = int(round(top * len(y)))
-    lift = y[order[:k]].mean() / y.mean()
-    ranks = pl.Series(p).rank().to_numpy()
-    n1 = y.sum()
-    auc = (ranks[y == 1].sum() - n1 * (n1 + 1) / 2) / (n1 * (len(y) - n1))
-    return lift, auc
-
-
-lift, auc = lift_auc(y, p)
-print(f"AUC {auc:.3f}, Gini {2 * auc - 1:.3f}, top-decile lift {lift:.2f}")
-```
-
-Top-decile lift in two lines, as on slide 46: the churn rate among the 10 % of customers with the highest predicted probability, divided by the overall churn rate.
-
-```{python}
 top = np.argsort(-p)[:round(0.1 * len(y))]
 lift = y[top].mean() / y.mean()          # 2.46
-# ties: two customers share the predicted probability at the cut; another sort order (e.g. kind="stable")
-# can swap them and move the lift in the second decimal (2.47)
-print(f"{len(top)} customers in the top decile: churn {y[top].mean():.3f} vs {y.mean():.3f} "
-      f"overall, lift {lift:.2f}")
 ```
 
-The decile table: customers ranked by predicted churn, decile 1 = highest risk. Decile 1 holds the same 328 customers as `top`.
+The threshold and the confusion matrix (slide 23): a customer is flagged when the predicted churn probability is at least the threshold.
 
 ```{python}
-order = np.argsort(-p)                    # same order as top, also for tied predictions
-ranked = (pl.DataFrame({"p": p[order], "churn": y[order]})
-          .with_columns(decile=(pl.int_range(1, pl.len() + 1) * 10 / pl.len())
-                        .ceil().cast(pl.Int64)))
-deciles = (ranked.group_by("decile").agg(pl.len().alias("customers"),
-                                         pl.col("churn").sum().alias("churners"),
-                                         pl.col("churn").mean().alias("churn_rate"),
-                                         pl.col("p").mean().alias("mean_predicted"))
-           .sort("decile")
-           .with_columns(lift=pl.col("churn_rate") / y.mean(),
-                         cum_gain=pl.col("churners").cum_sum() / pl.col("churners").sum()))
-GT(deciles).fmt_number(columns=["churn_rate", "mean_predicted", "cum_gain"], decimals=3) \
-    .fmt_number(columns="lift", decimals=2).tab_header(title="Deciles of predicted churn")
+# slide 23: the confusion matrix at a threshold of 0.5, and the same rates at 0.3
+flag = p >= 0.5
+print("flagged:     churned", (flag & (y == 1)).sum(), " stayed", (flag & (y == 0)).sum())
+print("not flagged: churned", (~flag & (y == 1)).sum(), " stayed", (~flag & (y == 0)).sum())
+print("accuracy", round((flag == y).mean(), 3), "  'nobody churns'", round(1 - y.mean(), 3))
+print("churners caught", round(flag[y == 1].mean(), 3), " precision", round(y[flag].mean(), 3),
+      " share flagged", round(flag.mean(), 3))
+flag = p >= 0.3
+print("at 0.3: churners caught", (flag & (y == 1)).sum(), "=", round(flag[y == 1].mean(), 3),
+      " precision", round(y[flag].mean(), 3), " share flagged", round(flag.mean(), 3))
 ```
 
-The cumulative gains chart: the share of all churners reached when contacting the top x % of customers.
+Accuracy misleads when most customers stay: 77.9 % at 0.5, but "nobody churns" already scores 75.8 %, and only 22 % of the churners are caught (56 % at 0.3). Ranking instead (slide 24):
 
 ```{python}
-n = len(y)
-gains = pl.DataFrame({"share_contacted": np.arange(0, n + 1) / n,
-                      "share_churners": np.r_[0, np.cumsum(y[order])] / y.sum()})
-marks = gains.filter(pl.col("share_contacted").is_in(
-    [round(s * n) / n for s in [0.1, 0.2, 0.3, 0.5]]))
-print(marks)
-
-(ggplot(gains.to_pandas(), aes("share_contacted", "share_churners"))
- + geom_abline(linetype="dashed", color="#8C8C8C")
- + geom_line(color="#002350", size=1)
- + geom_point(marks.to_pandas(), color="#0096D3", size=3)
- + scale_x_continuous(labels=percent)
- + scale_y_continuous(labels=percent)
- + labs(x="Share of customers contacted (ranked by predicted churn)",
-        y="Share of churners reached", title="Cumulative gains on the test customers")
- + theme_minimal()
- + theme(figure_size=(6, 4.5)))
+# slide 24: top-decile lift, churners reached in the top 10 % and 30 %, AUC, and the gains chart
+top30 = np.argsort(-p)[:round(0.3 * len(y))]
+print("test customers", len(y), " churn: all", round(y.mean(), 3), " top 10 %", round(y[top].mean(), 3),
+      " lift", round(lift, 2))
+print("churners reached: top 10 %", round(y[top].sum() / y.sum(), 3),
+      " top 30 %", round(y[top30].sum() / y.sum(), 3))
+print("AUC", round(mannwhitneyu(p[y == 1], p[y == 0]).statistic / ((y == 1).sum() * (y == 0).sum()), 3))
+gains = pl.DataFrame({"called": np.arange(1, len(y) + 1) / len(y),
+                      "reached": np.cumsum(y[np.argsort(-p)]) / y.sum()})
+(ggplot(gains.to_pandas(), aes("called", "reached")) + geom_line() + geom_abline(linetype="dashed")
+ + labs(x="Customers called, highest risk first (share)", y="Churners reached (share)"))
 ```
 
-How to read it: AUC 0.764 (Gini 0.529); calling the top 10 % reaches 24.6 % of all churners (59.5 % of them churn, a lift of 2.46), the top 30 % reaches 57.3 % and the top half 78.8 %.
+The top 10 % churn at 59.5 % against 24.2 % overall, a lift of 2.46, and hold 24.6 % of all churners (top 30 %: 57.3 %). With a fixed budget, call from the top of the ranked list.
 
-## Step 10: calibration
+## Step 4: whom to call? Risk is not uplift
 
-Does a predicted 30 % mean that about 30 % churn? The Brier score is the mean squared error of the predicted probabilities; the reference is the score of predicting the churn rate for everyone, ȳ(1 − ȳ).
+Part 4, slide 25. The offer was randomised, so within any group the churn difference between customers with and without the offer is its effect, the uplift (below 0 = fewer churners). The risk score comes from the churn model fitted on customers without the offer.
 
 ```{python}
-brier = np.mean((p - y) ** 2)
-print(f"Brier score {brier:.3f}; "
-      f"predicting the churn rate for everyone: {y.mean() * (1 - y.mean()):.3f}")
+# slide 25 (left): the offer effect by quartile of predicted churn risk
+control = churn.filter(pl.col("retention_offer") == 0).to_pandas()
+risk_model = smf.logit(FORMULA + " + satisfaction + C(country)", data=control).fit(disp=0)
+pilot = churn.with_columns(risk=risk_model.predict(df).to_numpy())
+pilot = pilot.with_columns(risk_group=pl.col("risk").qcut(4, labels=["Q1 low", "Q2", "Q3", "Q4 high"]))
+offer = pl.col("retention_offer") == 1
+p0, p1 = pl.col("churn").filter(~offer).mean(), pl.col("churn").filter(offer).mean()   # without, with the offer
+pilot.group_by("risk_group").agg(without=p0, with_offer=p1, effect_pp=100 * (p1 - p0)).sort("risk_group")
+```
 
-calibration = (pl.DataFrame({"p": p, "churn": y})
-               .with_columns(bin=pl.col("p").qcut(10, labels=[str(i) for i in range(1, 11)]))
-               .group_by("bin").agg(pl.col("p").mean().alias("mean_predicted"),
-                                    pl.col("churn").mean().alias("observed"),
-                                    pl.len().alias("customers"))
-               .sort("mean_predicted"))
-GT(calibration).fmt_number(columns=["mean_predicted", "observed"], decimals=3) \
-    .tab_header(title="Calibration by decile of predicted churn")
+The highest-risk quartile gains no more than the third (−10.2 vs −11.1 pp). By complaint calls, with a 95 % confidence interval for the difference of two shares:
+
+```{python}
+# slide 25 (right): the offer effect by complaint calls (0, 1, 2, 3+), with its 95 % CI
+pilot = pilot.with_columns(calls=pl.when(pl.col("complaints") >= 3).then(pl.lit("3+"))
+                           .otherwise(pl.col("complaints").cast(pl.String)))
+se = (p0 * (1 - p0) / (~offer).sum() + p1 * (1 - p1) / offer.sum()).sqrt()
+by_calls = (pilot.group_by("calls")
+            .agg(n=pl.len(), without=p0, with_offer=p1, effect_pp=100 * (p1 - p0),
+                 low_pp=100 * (p1 - p0 - 1.96 * se), high_pp=100 * (p1 - p0 + 1.96 * se))
+            .sort("calls"))
+by_calls
 ```
 
 ```{python}
-(ggplot(calibration.to_pandas(), aes("mean_predicted", "observed"))
- + geom_abline(linetype="dashed", color="#8C8C8C")
- + geom_line(color="#002350")
- + geom_point(color="#002350", size=2.5)
- + scale_x_continuous(labels=percent, limits=(0, 0.7))
- + scale_y_continuous(labels=percent, limits=(0, 0.7))
- + labs(x="Mean predicted churn (decile)", y="Observed churn")
- + theme_minimal()
- + theme(figure_size=(4.5, 4.5)))
-```
-
-Two summary numbers: the calibration slope (a logit of churn on the log-odds of the prediction; ideal 1) and calibration-in-the-large (the intercept when the log-odds of the prediction enter as an offset; ideal 0).
-
-```{python}
-lp = np.log(p / (1 - p))                                     # predicted log-odds
-slope = sm.Logit(y, sm.add_constant(lp)).fit(disp=0).params[1]
-citl = sm.GLM(y, np.ones_like(lp), family=sm.families.Binomial(), offset=lp).fit().params[0]
-print(f"calibration slope {slope:.3f}, calibration-in-the-large {citl:.3f}")
-```
-
-A note on oversampling. Churners are a minority, and some analysts sample 50/50 before fitting. For a logit this leaves the slopes and the AUC almost unchanged but shifts the intercept, so every predicted probability is too high and the calibration of this step breaks. If you sample on the outcome, correct the intercept afterwards (King & Zeng 2001): $\hat\beta_0^{\text{corrected}} = \hat\beta_0 - \ln\left[\frac{1 - \tau}{\tau} \cdot \frac{\bar y}{1 - \bar y}\right]$, where τ is the churn rate in the population and ȳ the churn share in the sample.
-
-How to read it: the predictions are well calibrated on these test customers (Brier 0.152 vs 0.183, slope 1.06, calibration-in-the-large 0.06), because test and training customers come from the same period and countries; Step 13 shows a case where they are not.
-
-## Step 11: campaign profit and the cost threshold
-
-What is the best number of customers to contact? The economics are invented for teaching: a customer who stays is worth LTV = EUR 400, a share γ = 0.25 of the contacted would-be churners accepts the offer and stays, the offer costs δ = EUR 30 (paid by every contacted customer who takes it) and each contact c = EUR 3. With customers ranked by predicted churn, the profit of contacting the top k is (Neslin et al. 2006)
-
-profit_k = (γ·LTV + δ·(1 − γ)) · churners among the top k − (δ + c) · k.
-
-```{python}
-LTV, gamma, delta, contact_cost = 400, 0.25, 30, 3          # EUR, illustrative
-cum_churners = np.cumsum(y[order])                     # order of Step 9
-k = np.arange(1, n + 1)
-profit = (gamma * LTV + delta * (1 - gamma)) * cum_churners - (delta + contact_cost) * k
-best = profit.argmax()
-p_star = (contact_cost + delta) / (gamma * LTV + delta * (1 - gamma))
-print(f"optimum: contact the top {k[best] / n:.3f} of customers, profit EUR {profit[best]:,.0f}")
-print(f"top 10 %: EUR {profit[round(0.1 * n) - 1]:,.0f}; everyone: EUR {profit[-1]:,.0f}")
-print(f"break-even churn probability p* = {p_star:.3f}; share above p*: {(p > p_star).mean():.3f}")
-```
-
-```{python}
-profit_curve = pl.DataFrame({"share_contacted": k / n, "profit": profit / 1000})
-(ggplot(profit_curve.to_pandas(), aes("share_contacted", "profit"))
- + geom_hline(yintercept=0, color="#8C8C8C")
- + geom_line(color="#002350", size=1)
- + geom_point(pl.DataFrame({"share_contacted": [k[best] / n],
-                            "profit": [profit[best] / 1000]}).to_pandas(), color="#0096D3", size=3)
- + scale_x_continuous(labels=percent)
- + labs(x="Share of customers contacted (ranked by predicted churn)",
-        y="Campaign profit (EUR thousand)", title="Illustrative campaign economics")
- + theme_minimal()
- + theme(figure_size=(6, 4)))
-```
-
-How to read it: profit peaks when the top 39 % are contacted (EUR 25,262 on these 3,284 customers) and turns negative when everyone gets the offer (EUR −11,107); the per-customer rule "contact if p > p* = 0.27" gives a similar depth (33 % of customers) but needs calibrated probabilities (Step 10).
-
-## Step 12: uplift with the randomised offer
-
-High churn risk is not the same as a large response to the offer. Because the offer was assigned at random, the difference in churn between customers with and without the offer is its effect, in any group we form before the offer. First a risk score: a churn model fitted only on the customers without the offer, so the offer does not contaminate the score, then quartiles of that score for all customers.
-
-```{python}
-ctrl = df[df["retention_offer"] == 0]
-risk = smf.logit(FORMULA + " + satisfaction + C(country)",
-                 data=ctrl).fit().predict(df)
-df["risk"] = risk
-df["risk_group"] = pl.Series(df["risk"]).qcut(
-    4, labels=["Q1 low", "Q2", "Q3", "Q4 high"]).to_list()
-df.pivot_table("churn", "risk_group", "retention_offer")
-```
-
-Churn without (0) and with (1) the offer in each risk quartile: the code of slide 46. The table below adds the difference with its confidence interval.
-
-The offer effect per group, with a 95 % confidence interval for the difference of two proportions:
-
-```{python}
-def offer_effect(data, group):
-    """Churn without and with the offer, the difference in pp and its 95 % CI, by group."""
-    offer = pl.col("retention_offer")
-    return (data.group_by(group).agg(
-                pl.len().alias("n"),
-                (offer == 0).sum().alias("n0"), (offer == 1).sum().alias("n1"),
-                pl.col("churn").filter(offer == 0).mean().alias("without"),
-                pl.col("churn").filter(offer == 1).mean().alias("with_offer"))
-            .with_columns(effect_pp=100 * (pl.col("with_offer") - pl.col("without")),
-                          se_pp=100 * (pl.col("without") * (1 - pl.col("without")) / pl.col("n0")
-                                       + pl.col("with_offer") * (1 - pl.col("with_offer"))
-                                       / pl.col("n1")).sqrt())
-            .with_columns(low_pp=pl.col("effect_pp") - 1.96 * pl.col("se_pp"),
-                          high_pp=pl.col("effect_pp") + 1.96 * pl.col("se_pp"))
-            .rename({group: "group"})
-            .with_columns(pl.col("group").cast(pl.String))
-            .sort("group")
-            .drop("se_pp"))
-
-
-pilot = pl.from_pandas(df).with_columns(
-    complaint_group=pl.when(pl.col("complaints") >= 3).then(pl.lit("3+"))
-    .otherwise(pl.col("complaints").cast(pl.String)))
-by_risk = offer_effect(pilot, "risk_group")
-by_complaints = offer_effect(pilot, "complaint_group")
-effects = pl.concat([by_risk.with_columns(split=pl.lit("By predicted churn risk (quartile)")),
-                     by_complaints.with_columns(split=pl.lit("By complaint calls"))])
-GT(effects, groupname_col="split", rowname_col="group") \
-    .fmt_integer(columns=["n", "n0", "n1"]).fmt_number(columns=["without", "with_offer"], decimals=3) \
-    .fmt_number(columns=["effect_pp", "low_pp", "high_pp"], decimals=1, force_sign=True) \
-    .tab_header(title="Effect of the retention offer on churn",
-                subtitle="Randomised pilot; negative = fewer churners")
-```
-
-An uplift model lets the offer effect depend on complaints and the contract. The predicted uplift of a customer is the predicted churn with the offer minus without it.
-
-```{python}
-two = smf.logit("churn ~ retention_offer * (complaints + monthly) + price_increase"
-                " + np.log(tenure_months) + C(country)", data=df).fit(disp=0)
-uplift = two.predict(df.assign(retention_offer=1)) - two.predict(df.assign(retention_offer=0))
-print(f"mean predicted uplift {100 * uplift.mean():+.2f} pp; "
-      f"correlation of risk and uplift {np.corrcoef(df['risk'], uplift)[0, 1]:.2f}")
-```
-
-The correlation is negative because uplift is negative when the offer helps: on average, customers with a higher risk get a larger reduction, but far from one to one.
-
-```{python}
-panels = pl.Enum(["By predicted churn risk (quartile)", "By complaint calls"])
-effects_plot = effects.with_columns(
-    colour=pl.when(pl.col("group") == "3+").then(pl.lit("grey")).otherwise(pl.lit("blue")),
-    split=pl.col("split").cast(panels))
-(ggplot(effects_plot.to_pandas(), aes("group", "effect_pp", fill="colour"))
- + geom_hline(yintercept=0, color="#8C8C8C")
- + geom_col(width=0.65)
+# the chart of slide 25 (right): offer effect on churn in pp with 95 % intervals
+(ggplot(by_calls.to_pandas(), aes("calls", "effect_pp"))
+ + geom_col(fill="#002350")
  + geom_errorbar(aes(ymin="low_pp", ymax="high_pp"), width=0.2)
- + facet_wrap("~split", scales="free_x")
- + scale_fill_manual(values={"blue": "#0096D3", "grey": "#8C8C8C"}, guide=None)
- + labs(x="", y="Offer effect on churn (pp)")
- + theme_minimal()
- + theme(figure_size=(8, 3.8)))
+ + geom_hline(yintercept=0)
+ + labs(x="Complaint calls", y="Offer effect on churn (pp)"))
 ```
 
-How to read it: the offer lowers churn by 3.3 pp in the lowest risk quartile, by 11.1 pp in the third and by 10.2 pp in the highest, and from three complaint calls on it does not help (+8.2 pp on 377 customers, with a confidence interval that includes zero); the highest-risk customers are not the ones the offer moves most, so target uplift, not risk, which needs a randomised control group (Ascarza 2018).
-
-## Step 13: does the model travel?
-
-A model fitted on German customers, used in the other countries. We fit the churn formula with satisfaction on the German training customers, score the test customers of every country and compare with each country's own model, fitted on its own training customers.
-
-```{python}
-de_model = smf.logit(FORMULA + " + satisfaction",
-                     data=df[~test & (df["country"] == "DE")]).fit(disp=0)
-
-rows = []
-for country in COUNTRIES:
-    in_country = (df["country"] == country).to_numpy()
-    own = smf.logit(FORMULA + " + satisfaction", data=df[~test & in_country]).fit(disp=0)
-    scored = df[test & in_country]
-    y_c = scored["churn"].to_numpy()
-    p_de, p_own = de_model.predict(scored).to_numpy(), own.predict(scored).to_numpy()
-    rows.append({"country": country, "auc_german_model": lift_auc(y_c, p_de)[1],
-                 "auc_own_model": lift_auc(y_c, p_own)[1],
-                 "mean_pred_german_model": p_de.mean(), "actual_churn": y_c.mean()})
-transfer = pl.DataFrame(rows)
-GT(transfer).fmt_number(columns=["auc_german_model", "auc_own_model", "mean_pred_german_model",
-                                 "actual_churn"], decimals=3) \
-    .tab_header(title="German model vs own model, test customers")
-```
-
-The German model ranks Spanish customers almost as well as Spain's own model (AUC 0.709 vs 0.718), but predicts 15.7 % churn where 35.2 % churn. The fix is to recalibrate the intercept on local data: keep the German coefficients as an offset (the German linear predictor) and estimate only a constant on the Spanish training customers.
-
-```{python}
-es_train = df[~test & (df["country"] == "ES")]
-es_test = df[test & (df["country"] == "ES")]
-shift = smf.glm("churn ~ 1", data=es_train, family=sm.families.Binomial(),
-                offset=de_model.predict(es_train, which="linear")).fit().params["Intercept"]
-recalibrated = 1 / (1 + np.exp(-(de_model.predict(es_test, which="linear") + shift)))
-print(f"intercept shift for Spain: {shift:+.3f}")
-print(f"mean predicted churn in Spain: German model {de_model.predict(es_test).mean():.3f}, "
-      f"recalibrated {recalibrated.mean():.3f}, actual {es_test['churn'].mean():.3f}")
-auc_recal = lift_auc(es_test["churn"].to_numpy(), recalibrated.to_numpy())[1]
-print(f"AUC after recalibration: {auc_recal:.3f}")
-```
-
-How to read it: the ranking travels, the level does not; shifting the intercept moves the mean prediction to the Spanish level and leaves the AUC unchanged, because a common shift in log-odds does not change the order of the customers.
+From three complaint calls on the offer does not help (+8.2 pp on 377 customers, the interval includes 0). Call the customers the offer moves, not the riskiest: it takes a random control group.
 
 ## Your turn
 
-Work in pairs (35 minutes). Use the code of the steps above. The in-class version of these tasks, with hints and space for your answers, is `churn_exercise.qmd`.
+Work in pairs (35 minutes), with `churn_exercise.qmd` for hints and your answers (slide 34).
 
-1. **Fit** the pooled churn logit with country dummies (reuse Step 2). How large is the month-to-month AME in each country?
-
-```{python}
-# your code
-```
-
-2. **Compare** the AME of month-to-month by country with the coefficients of the separate country logits (Steps 3 and 4). Write two sentences for a board memo.
-
-```{python}
-# your code
-```
-
-3. **Evaluate** on the 30 % test set: compute the confusion matrix at 0.5 and the top-decile lift (Steps 8 and 9).
-
-```{python}
-# your code
-```
-
-4. **Target** with the pilot: estimate the offer effect by complaint calls (Step 12) and propose who should get the offer.
-
-```{python}
-# your code
-```
-
-5. **Extra**: repeat Step 13 with Poland as the training country.
-
-```{python}
-# your code
-```
+1. **Fit** the pooled churn logit with country dummies; the month-to-month AME per country (Step 2).
+2. **Compare** the AMEs with the separate country coefficients; two memo sentences (Part 3).
+3. **Evaluate**: confusion matrix at 0.5 and top-decile lift on the 30 % test set (Step 3).
+4. **Target**: the offer effect by complaint calls; who should get the offer? (Step 4).
+5. **Extra**: fit the model of Step 3 on the Polish training customers only and score the test customers of every country. Does the ranking travel (lift or AUC against each country's own model)? Does the level (mean predicted churn against actual churn)?
 
 Deliverable: one slide per pair with a plot and two sentences for the retention manager.

@@ -17,7 +17,7 @@ A mobile operator loses customers in Germany, Austria, Spain and Poland. The ret
 | 2 | **Plenary**: the answers | 5 minutes |
 | 3 | **Posit Assistant**: the same tasks with the assistant; compare its code, numbers and wording with yours (last section) | 10 minutes |
 
-Use `logit_churn.qmd` as a template: each task names the step whose code you can reuse. Deliverable: one slide per pair with a plot and two sentences for the retention manager.
+Use `logit_churn.qmd` as a template: each task names the step or part whose code you can reuse. Deliverable: one slide per pair with a plot and two sentences for the retention manager.
 
 ## The data
 
@@ -47,7 +47,7 @@ def ame(model, data, var, by="country"):
 
 The Spanish counts of slide 12 (invented round numbers): 45 of 100 month-to-month customers churn, and 25 of 100 customers on a 24-month contract. With a calculator: the churn probability p, the odds and the log-odds of both groups, then the odds ratio and the difference in log-odds. Germany had an odds ratio of 3.0 and a gap of +15 pp. Where does the contract matter more, Germany or Spain?
 
-Tip: odds = p / (1 − p), log-odds = ln(odds). To check, copy `from_counts()` from Step 1, build the 200 customers with `from_counts(45, 25)` and fit `smf.logit("churn ~ monthly", ...)`.
+Tip: odds = p / (1 − p), log-odds = ln(odds). To check, build the 200 customers as in Part 1 of `logit_churn.qmd` (with 45 and 25 churners) and fit `smf.logit("churn ~ monthly", ...)`.
 
 ```{python}
 # your code here (optional check)
@@ -69,7 +69,7 @@ Tip: `ame(m, df, "monthly")` gives the AME by country as a share; multiply by 10
 
 ## Task 2: compare
 
-Fit one logit per country with `FORMULA` (Step 4) and put the `monthly` coefficient and its AME next to the pooled AMEs of Task 1. Which country leads on each scale? Write two sentences for a board memo: which number do you report, and why?
+Fit one logit per country with `FORMULA` (Part 3) and put the `monthly` coefficient and its AME next to the pooled AMEs of Task 1. Which country leads on each scale? Write two sentences for a board memo: which number do you report, and why?
 
 Tip: in a loop over `COUNTRIES`, `m_c.params["monthly"]` is the coefficient and `100 * m_c.get_margeff(at="overall", dummy=True).margeff[0]` the AME in pp.
 
@@ -81,7 +81,7 @@ Tip: in a loop over `COUNTRIES`, `m_c.params["monthly"]` is the coefficient and 
 
 ## Task 3: evaluate
 
-Split the customers at random, 70 % training and 30 % test (`rng = np.random.default_rng(1)`, `test = rng.random(len(df)) < 0.3`), fit `FORMULA + " + satisfaction + C(country)"` on the training customers and predict the test customers (Step 8). Give the confusion matrix at a threshold of 0.5 (true positives, false positives, missed churners, true negatives) and the top-decile lift (Step 9). Explain each in one sentence for a manager.
+Split the customers at random, 70 % training and 30 % test (`rng = np.random.default_rng(1)`, `test = rng.random(len(df)) < 0.3`), fit `FORMULA + " + satisfaction + C(country)"` on the training customers and predict the test customers (Step 3). Give the confusion matrix at a threshold of 0.5 (true positives, false positives, missed churners, true negatives) and the top-decile lift (Step 3). Explain each in one sentence for a manager.
 
 Tip: `flag = p >= 0.5`, then count `flag & (y == 1)` and so on; `top = np.argsort(-p)[:round(0.1 * len(y))]` and `y[top].mean() / y.mean()`.
 
@@ -93,7 +93,7 @@ Tip: `flag = p >= 0.5`, then count `flag & (y == 1)` and so on; `top = np.argsor
 
 ## Task 4: target
 
-The retention offer was randomised, so within any group the difference in churn between customers with and without the offer is its effect (Step 12). Group the customers by complaint calls (0, 1, 2, 3+), give the churn rate without and with the offer and the difference in pp, and plot the effect. Who should get the offer, and why not simply the customers with the highest churn risk?
+The retention offer was randomised, so within any group the difference in churn between customers with and without the offer is its effect (Step 4). Group the customers by complaint calls (0, 1, 2, 3+), give the churn rate without and with the offer and the difference in pp, and plot the effect. Who should get the offer, and why not simply the customers with the highest churn risk?
 
 Tip: `pl.when(pl.col("complaints") >= 3).then(pl.lit("3+")).otherwise(pl.col("complaints").cast(pl.String))`, then `group_by` with `pl.col("churn").filter(pl.col("retention_offer") == 0).mean()` and the same for `== 1`.
 
@@ -103,7 +103,7 @@ Tip: `pl.when(pl.col("complaints") >= 3).then(pl.lit("3+")).otherwise(pl.col("co
 
 *Your answer:*
 
-Done early? Task 5 of `logit_churn.qmd` (section "Your turn"): Step 13 with Poland as the training country.
+Done early? Task 5 of `logit_churn.qmd` (section "Your turn"): the model of Step 3 trained on Polish customers and used in every country.
 
 ## Then: the same tasks with Posit Assistant
 
