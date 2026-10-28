@@ -46,9 +46,9 @@ train, test = y[:-24], y[-24:]      # holdout 2017-2018
 
 ## Task 1: by hand
 
-A café's weekly online table bookings, weeks 1–6 (invented round numbers): 20, 24, 22, 26, 27, 31. With a calculator, forecast week 7 with five methods: naive (no change), drift (same change), the mean, the moving average of the last 3 weeks and simple exponential smoothing with α 0.5 (start: level = first value; write down the level of every week). Then pretend weeks 5 and 6 are unknown: forecast them from week 4 with naive, drift and the mean, and compute each method's MAE. Which method wins, and why? (Steps 4 and 5; deck slides 12–15 and 22.)
+A café's weekly online table bookings, weeks 1–6 (invented round numbers): 20, 24, 22, 26, 27, 31. With a calculator, forecast week 7 with five methods: naive (no change), drift (same change), the mean, the moving average of the last 3 weeks and simple exponential smoothing with α 0.5 (start: level = first value; write down the level of every week). Then pretend weeks 5 and 6 are unknown: forecast them from week 4 with naive, drift and the mean, and compute each method's MAE. Which method wins, and why? (Steps 3 and 4, Extra A; deck slides 12–15 and 22.)
 
-Tip: drift = last value + (last − first) / (n − 1) for each week ahead; level = 0.5 × value + 0.5 × previous level; error = actual − forecast, MAE = the mean of the errors without their signs. To check in Python, use the statsmodels call of Step 4 with `BOOKINGS`: `tsa.SimpleExpSmoothing(BOOKINGS, initialization_method="known", initial_level=20).fit(smoothing_level=0.5, optimized=False)`, then `.level` (the level of every week) and `.forecast(1)` (week 7).
+Tip: drift = last value + (last − first) / (n − 1) for each week ahead; level = 0.5 × value + 0.5 × previous level; error = actual − forecast, MAE = the mean of the errors without their signs. To check in Python, use the statsmodels call of Extra A with `BOOKINGS`: `tsa.SimpleExpSmoothing(BOOKINGS, initialization_method="known", initial_level=20).fit(smoothing_level=0.5, optimized=False)`, then `.level` (the level of every week) and `.forecast(1)` (week 7).
 
 ```{python}
 # your code here (optional check)
@@ -58,7 +58,7 @@ Tip: drift = last value + (last − first) / (n − 1) for each week ahead; leve
 
 ## Task 2: look
 
-Plot café sales 2009–2018 with plotnine (Step 1). Describe trend and season in two sentences: how much did sales grow from 2009 to 2018, and how large is the December peak compared with clothing (December index 1.59)? Then run the ADF test on the levels and on the first difference (Step 6): which of the two is stationary?
+Plot café sales 2009–2018 with plotnine (Step 1). Describe trend and season in two sentences: how much did sales grow from 2009 to 2018, and how large is the December peak compared with clothing (December index 1.59)? Then run the ADF test on the levels and on the first difference (Extra C): which of the two is stationary?
 
 Tip: `tsa.seasonal_decompose(y, model="multiplicative", period=12).seasonal[:12]` gives the seasonal index of January to December; `tsa.adfuller(y)[1]` and `tsa.adfuller(np.diff(y))[1]` give the ADF p-values (small p, below 0.05 = stationary).
 
@@ -70,9 +70,9 @@ Tip: `tsa.seasonal_decompose(y, model="multiplicative", period=12).seasonal[:12]
 
 ## Task 3: test
 
-On the 2017–2018 holdout, compare five methods: the seasonal naive, Holt-Winters (multiplicative), SARIMA(0,1,1)(0,1,1)12 on log sales, the regression on log sales with trend + month dummies, and the same regression in levels (`"value ~ t + C(m)"`). Give MAE, RMSE and MAPE in one great_tables table sorted by MAE (Steps 2 and 3). Which method wins, and is it the same winner as for clothing? Do all methods beat the seasonal naive?
+On the 2017–2018 holdout, compare five methods: the seasonal naive, Holt-Winters (multiplicative), SARIMA(0,1,1)(0,1,1)12 on log sales, the regression on log sales with trend + month dummies, and the same regression in levels (`"value ~ t + C(m)"`). Give MAE, RMSE and MAPE in one great_tables table sorted by MAE (Steps 3, 6–9). Which method wins, and is it the same winner as for clothing? Do all methods beat the seasonal naive?
 
-Tip: copy the code of Steps 2 and 3; `train` and `test` of the first cell are already the café series. Add `fc["reg"] = smf.ols("value ~ t + C(m)", data=d[:-24]).fit().predict(d[-24:])` after the log regression; the great_tables table sorted by MAE is the one of Step 7.
+Tip: copy the code of Steps 3 and 6–8; `train` and `test` of the first cell are already the café series. The regression in levels is Step 7 with `"value ~ t + C(m)"` and without `np.exp()`. The MAE is the line of Step 4; RMSE is `np.sqrt(np.mean((test - snaive) ** 2))` and MAPE `np.mean(np.abs(test - snaive) / test) * 100`. Put the numbers in a table as in Step 9, sort it with `.sort("MAE")` and show it with `GT(table)`.
 
 ```{python}
 # your code here
@@ -82,9 +82,9 @@ Tip: copy the code of Steps 2 and 3; `train` and `test` of the first cell are al
 
 ## Task 4: forecast
 
-Refit the winner of Task 3 on all 120 months and forecast 2019 with a 95 % band; do the same with SARIMA. Plot 2016–2019 with the bands and the actual January–April 2019 (in the file, after December 2018). How many of the four months fall inside each band? Compute the Durbin–Watson statistic of the regression's residuals: which band would you use to plan staff and stock, and why? (Steps 8 and 9.)
+Refit the winner of Task 3 on all 120 months and forecast 2019 with a 95 % band; do the same with SARIMA. Plot 2016–2019 with the bands and the actual January–April 2019 (in the file, after December 2018). How many of the four months fall inside each band? Compute the Durbin–Watson statistic of the regression's residuals: which band would you use to plan staff and stock, and why? (Step 10; Extra D.)
 
-Tip: for the regression, the 2019 frame needs `t` = 121 … 132 and `m` = 1 … 12; `m.get_prediction(new).summary_frame(alpha=0.05)` gives `mean`, `obs_ci_lower` and `obs_ci_upper`. For SARIMA, `sar.get_forecast(12).conf_int(alpha=0.05)` is on the log scale, so take `np.exp()` of it and of `predicted_mean`. `durbin_watson(m.resid)`: 2 = no autocorrelation.
+Tip: for the regression, the 2019 frame of Step 10 needs `t` = 121 … 132 and `m` = 1 … 12; `m.get_prediction(new).summary_frame(alpha=0.05)` gives `mean`, `obs_ci_lower` and `obs_ci_upper`. For SARIMA, `sar.get_forecast(12).conf_int(alpha=0.05)` is on the log scale, so take `np.exp()` of it and of `predicted_mean`. `durbin_watson(m.resid)`: 2 = no autocorrelation (Extra D). The actual January–April 2019: `cafes.filter(pl.col("month").dt.year() == 2019)`.
 
 ```{python}
 # your code here
@@ -94,7 +94,7 @@ Tip: for the regression, the 2019 frame needs `t` = 121 … 132 and `m` = 1 … 
 
 ## Extra (done early?)
 
-Fit ETS(M,A,M) with `tsa.ETSModel(train, error="mul", trend="add", seasonal="mul", seasonal_periods=12).fit(disp=False)`, forecast the 24 holdout months with `.forecast(24)` and add it to the table of Task 3 (Step 7). Does it beat the regression?
+Fit ETS(M,A,M) with `tsa.ETSModel(train, error="mul", trend="add", seasonal="mul", seasonal_periods=12).fit(disp=False)`, forecast the 24 holdout months with `.forecast(24)` and add it to the table of Task 3. Does it beat the regression?
 
 ```{python}
 # your code here
