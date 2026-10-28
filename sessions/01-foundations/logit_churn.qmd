@@ -9,7 +9,7 @@ execute:
   warning: false
 ---
 
-The Python part of the deck (slides 29–37), step by step: we start with one line that fits a logistic regression and add one new thing per step. The code is the code on the slides, character for character. Run the chunks in order.
+The Python part of the deck (slides 30–38), step by step: we start with one line that fits a logistic regression and add one new thing per step. The code is the code on the slides, character for character. Run the chunks in order.
 
 The data are simulated for a mobile operator (`data/churn/telco_churn.csv`): 11,000 customers in Germany (DE), Austria (AT), Spain (ES) and Poland (PL). The columns we use:
 
@@ -154,7 +154,7 @@ m_es.get_margeff(at="overall",
                  dummy=True).summary()
 ```
 
-AME of `monthly`: Germany 0.152 (interval 0.124 to 0.179), Spain 0.173 (0.135 to 0.210). Spain is a little higher, but the intervals overlap: the difference is within chance. Compare countries in percentage points: the coefficients (1.189 in Germany, 0.810 in Spain, in `m_de.summary()` and `m_es.summary()`) rank them the other way round (slides 17–19).
+AME of `monthly`: Germany 0.152 (interval 0.124 to 0.179), Spain 0.173 (0.135 to 0.210). Spain is a little higher, but the intervals overlap: the difference is within chance. Compare countries in percentage points: the coefficients (1.189 in Germany, 0.810 in Spain, in `m_de.summary()` and `m_es.summary()`) rank them the other way round (slides 18–20).
 
 ## Step 9: How good is the model?
 
@@ -171,11 +171,11 @@ groups = scored.group_by("flagged").agg(
 groups.sort("flagged")
 ```
 
-884 customers are flagged and 57.9 % of them churn, against 20.5 % of the 10,116 others: the model finds the risky customers. These are the customers the model was fitted on; Part 4 (slides 23 and 24) checks the model on new customers.
+884 customers are flagged and 57.9 % of them churn, against 20.5 % of the 10,116 others: the model finds the risky customers. These are the customers the model was fitted on; Part 4 (slides 24 and 25) checks the model on new customers.
 
 ## Your turn
 
-The in-class exercise is in `churn_exercise.qmd` (slide 41); each task names the step whose code you copy.
+The in-class exercise is in `churn_exercise.qmd` (slide 42); each task names the step whose code you copy.
 
 1. **Fit:** m3 of Step 5: odds ratio, AME and predictions for Austria and Poland (Steps 3, 6, 7)
 2. **Compare:** Step 8 for Austria: coefficient vs AME, next to Spain; two memo sentences
