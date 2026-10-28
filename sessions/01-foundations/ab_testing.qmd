@@ -9,337 +9,175 @@ execute:
   warning: false
 ---
 
-The code of the A/B testing deck, in the order of the deck. The mobile operator of the churn session tests its retention e-mail in Germany and Spain; the outcome is a click on the link. The data are simulated, one row per customer, and sit two folders up in `data/abtest/`. The same code as a plain Python script: `ab_testing.py`; the in-class exercise, `ab_exercise.qmd`, reuses these steps.
+The code of the A/B testing deck (slides 29 to 33). The mobile operator of the churn session tests its retention e-mail in Germany and Spain; the outcome is a click on the link. Every effect is an OLS regression on 0/1 dummies: coefficient × 100 = percentage points (pp). The data are simulated, one row per customer, in `data/abtest/`. The same code as a plain Python script: `ab_testing.py`; the in-class exercise `ab_exercise.qmd` reuses these steps.
 
 | File | Columns |
 |---|---|
-| `email_ab.csv`: the A/B test, 40,000 customers | `customer_id`, `country` (DE, ES), `device` (mobile, desktop), `version` (A = generic subject line, B = with the first name), `clicked` (1 = clicked the link), `unsubscribed` (1 = left the mailing list) |
-| `email_factorial.csv`: the 2 × 2 test, 40,000 customers | the same columns, with `personal` (1 = first name) and `discount` (1 = 10 % off the next bill) instead of `version` |
+| `email_ab.csv`: the A/B test, 40,000 customers | `customer_id`, `country` (DE, ES), `device` (mobile, desktop), `version` (A = generic subject line, B = with the first name), `split` (the same as a dummy: 0 = control, e-mail A; 1 = test, e-mail B), `clicked` (1 = clicked the link), `unsubscribed` (1 = left the mailing list) |
+| `email_factorial.csv`: the 2 × 2 test, 40,000 customers | the same columns, with the dummies `personal` (1 = first name) and `discount` (1 = 10 % off the next bill) instead of `version` and `split` |
 
 ```{python}
 # the packages of slide 30; Steps 1 to 3 repeat their imports, as on the slides
-import numpy as np
 import polars as pl
 import statsmodels.formula.api as smf
-from plotnine import (aes, facet_wrap, geom_histogram, geom_hline, geom_line, geom_point, geom_vline,
-                      ggplot, labs)
-from scipy import stats
-from statsmodels.stats.anova import anova_lm
-from statsmodels.stats.power import NormalIndPower
-from statsmodels.stats.proportion import proportion_effectsize, proportions_ztest
+from plotnine import aes, geom_col, geom_line, geom_point, ggplot, labs
 ```
 
-## Step 1: load and check the split
+## Step 1: load, dummy coding and the split check
 
-The code of slide 31: customers, clicks and click rate per version, and the test of the counts against the planned 50:50 split (SRM, sample ratio mismatch).
+The code of slide 31. A dummy is a 0/1 column: `mobile` is 1 for customers who read on mobile, `spain` is 1 for Spain. The split check counts the customers per group; the mean of a 0/1 column is a share, so we also get the click rate and the share on mobile.
 
 ```{python}
 import polars as pl
-from scipy import stats
 
-ab = pl.read_csv("../../data/abtest/email_ab.csv")
+ab = pl.read_csv(
+    "../../data/abtest/email_ab.csv")
 
-split = (ab.group_by("version")
-         .agg(pl.len().alias("n"),
-              pl.col("clicked").sum().alias("clicks"),
-              pl.col("clicked").mean().alias("click_rate"))
-         .sort("version"))
-stats.chisquare(split["n"].to_list()).pvalue  # SRM
-split
+# dummy coding: 1 = yes, 0 = no
+ab = ab.with_columns(
+    mobile=(pl.col("device") == "mobile")
+    .cast(pl.Int64),
+    spain=(pl.col("country") == "ES")
+    .cast(pl.Int64))
+
+# split check: customers per group
+(ab.group_by("split", "version")
+ .agg(n=pl.len(),
+      click_rate=pl.col("clicked").mean(),
+      mobile=pl.col("mobile").mean())
+ .sort("split"))
 ```
 
-A notebook shows only the last line of a chunk, so we print the SRM p here, next to the invented broken split of slide 17.
+20,000 customers in each group, as planned (the e-mail tool split each market exactly 50:50). The groups are alike: 59.5 % and 59.9 % read on mobile (slide 10). The click rate is 3.33 % with e-mail A and 3.93 % with e-mail B (slide 6).
 
 ```{python}
-# SRM p of our split and of the broken split of slide 17 (20,000 vs 19,300)
-print("SRM p, our test:", round(stats.chisquare(split["n"].to_list()).pvalue, 3))
-print("SRM p, broken split:", round(stats.chisquare([20_000, 19_300]).pvalue, 4))
+# the split per market: 10,000 per version in Germany and in Spain
+(ab.group_by("country", "version")
+ .agg(n=pl.len())
+ .sort("country", "version"))
 ```
 
-Our SRM p is 1.000, so the split is as planned; the broken split gives 0.0004, below 0.001: stop and look for the bug.
-
 ```{python}
-# balance check: the share on mobile and from Spain per version (slide 10)
-(ab.group_by("version")
- .agg((pl.col("device") == "mobile").mean().alias("share_mobile"),
-      (pl.col("country") == "ES").mean().alias("share_spain"))
- .sort("version"))
+# bar chart: the click rate per version (slide 6)
+rates = ab.group_by("version").agg(click_rate=pl.col("clicked").mean())
+(ggplot(rates, aes("version", "click_rate"))
+ + geom_col()
+ + labs(x="Version", y="Click rate"))
 ```
 
-The coin flip made the groups alike: 59.5 % vs 59.9 % read on mobile, and 50 % come from Spain in both (10,000 per version and market).
+## Step 2: the effect of B with OLS
 
-## Step 2: difference, z-test, CI and power
-
-The code of slide 32. Index 0 is version A and index 1 is version B, so the sign is B − A; the last line asks how many customers per version detect 3.3 % → 3.9 % with 80 % power.
+The code of slide 32. With the dummy `split` the intercept is the click rate of e-mail A and the coefficient of `split` is the difference B − A; × 100 gives pp. OLS on a 0/1 outcome is a linear probability model; with groups this large it gives the same answer as a two-proportion z-test.
 
 ```{python}
-from statsmodels.stats.proportion import (
-    proportions_ztest, confint_proportions_2indep,
-    proportion_effectsize)
-from statsmodels.stats.power import NormalIndPower
+import statsmodels.formula.api as smf
 
-x, n = split["clicks"].to_list(), split["n"].to_list()
-z, p = proportions_ztest([x[1], x[0]], [n[1], n[0]])
-lo, hi = confint_proportions_2indep(x[1], n[1],
-                                    x[0], n[0])   # B - A
+# B - A: the coefficient of the dummy split
+m = smf.ols("clicked ~ split",
+            data=ab.to_pandas()).fit()
+print((m.params * 100).round(3))     # pp
+print(m.pvalues.round(4))
+print((m.conf_int() * 100).round(2))  # CI
 
-es = proportion_effectsize(0.039, 0.033)
-NormalIndPower().solve_power(es, alpha=0.05, power=0.8)
+# moderator: does B work better on mobile?
+m_mob = smf.ols("clicked ~ split * mobile",
+                data=ab.to_pandas()).fit()
+print((m_mob.params * 100).round(3))
+print(m_mob.pvalues.round(4))
 ```
 
-The chunk shows only the sample size: 15,106.9, so 15,107 customers per version. The other results, in percentage points (pp):
+E-mail A: 3.325 %, or 3.33 % rounded; B adds +0.60 pp (p 0.0013), and the 95 % confidence interval (CI) runs from 0.23 to 0.97 pp (slide 15). In the moderator model `split` is the effect on desktop (+0.13 pp, the reference group `mobile` = 0), and `split:mobile` is the extra effect on mobile: +0.79 pp (p 0.0376, slide 18).
 
 ```{python}
-# B − A in pp, the relative lift, z, p and the 95 % CI
-diff = x[1] / n[1] - x[0] / n[0]
-print("B - A in pp:", round(diff * 100, 2))
-print("relative lift in %:", round(diff / (x[0] / n[0]) * 100, 1))
-print("z:", round(z, 2), " p:", round(p, 4))
-print("95 % CI in pp:", round(lo * 100, 2), "to", round(hi * 100, 2))
+# the relative lift: B − A as a share of A, in %
+print(round(m.params["split"] / m.params["Intercept"] * 100, 1))
 ```
 
-B adds 0.60 pp (3.33 % → 3.93 %, +18 % relative); the effect is plausibly between 0.23 and 0.97 pp. The unsubscribe rate is the guardrail, tested the same way:
+The +0.60 pp are +18 % relative to A's 3.33 %; we report pp and say which one we mean (slide 6).
 
 ```{python}
-# guardrail: the unsubscribe rate per version and its z-test (slide 15)
-unsub = (ab.group_by("version")
-         .agg(pl.len().alias("n"),
-              pl.col("unsubscribed").sum().alias("unsubscribes"),
-              pl.col("unsubscribed").mean().alias("unsub_rate"))
-         .sort("version"))
-u, nu = unsub["unsubscribes"].to_list(), unsub["n"].to_list()
-print("unsubscribes, B - A in pp:", round((u[1] / nu[1] - u[0] / nu[0]) * 100, 3))
-print("unsubscribes, p:", round(proportions_ztest([u[1], u[0]], [nu[1], nu[0]])[1], 3))
-unsub
+# the guardrail: unsubscribes, the same model (slides 14 and 15)
+m_unsub = smf.ols("unsubscribed ~ split", data=ab.to_pandas()).fit()
+print((m_unsub.params * 100).round(3))   # pp
+print(m_unsub.pvalues.round(3))
 ```
 
 Unsubscribes rise from 0.31 % to 0.41 % (+0.105 pp, p 0.079): within noise, but watch it in the next send.
 
-## Step 3: the factorial regression and plot
+```{python}
+# B − A on mobile and on desktop: the model of slide 32 on each group (slide 18)
+m_m = smf.ols("clicked ~ split", data=ab.filter(pl.col("mobile") == 1).to_pandas()).fit()
+m_d = smf.ols("clicked ~ split", data=ab.filter(pl.col("mobile") == 0).to_pandas()).fit()
+print("mobile:", round(m_m.params["split"] * 100, 2), "pp, p", round(m_m.pvalues["split"], 4))
+print("desktop:", round(m_d.params["split"] * 100, 2), "pp, p", round(m_d.pvalues["split"], 4))
+print("customers:", m_m.nobs, m_d.nobs)
+```
 
-The code of slide 33. `personal * discount` gives the two factors and their product term; OLS on 0/1 clicks is a linear probability model, so the coefficients × 100 are pp.
+B adds +0.92 pp on mobile (23,885 customers, p 0.0002) and only +0.13 pp on desktop (16,115, p 0.66). Whether the two differ is the `split:mobile` term above (p 0.038). A segment found after the test is a hypothesis: confirm it in a new test.
+
+The market works the same way with the dummy `spain`: that is Task 2 of the in-class exercise.
+
+**Plan the next test (optional, slide 16).** How many customers per version detect 3.3 % → 3.9 % with 80 % power at the 5 % level?
 
 ```{python}
-import statsmodels.formula.api as smf
-from plotnine import aes, geom_line, geom_point, ggplot
+# customers per version for 3.3 % → 3.9 % with 80 % power
+from statsmodels.stats.power import NormalIndPower
+from statsmodels.stats.proportion import proportion_effectsize
 
-fa = pl.read_csv("../../data/abtest/email_factorial.csv")
-m = smf.ols("clicked ~ personal * discount",
-            data=fa.to_pandas()).fit()
-m.params * 100                     # in pp
+NormalIndPower().solve_power(proportion_effectsize(0.039, 0.033), alpha=0.05, power=0.8)
+```
 
+15,106.9: round up to 15,107 per version; our 20,000 per version are enough.
+
+## Step 3: the 2 × 2 with OLS and its plot
+
+The code of slide 33. `personal * discount` gives the two dummies and their product term. The intercept is the control cell (generic, no discount), `personal` the first name without the discount, `discount` the discount with the generic subject line, and `personal:discount` the interaction in pp.
+
+```{python}
+from plotnine import ggplot, aes, labs
+from plotnine import geom_line, geom_point
+
+fa = pl.read_csv(
+    "../../data/abtest/email_factorial.csv")
+m2 = smf.ols("clicked ~ personal * discount",
+             data=fa.to_pandas()).fit()
+print((m2.params * 100).round(3))   # pp
+print(m2.pvalues.round(4))
+
+# interaction plot: click rate per cell
 cells = (fa.group_by("personal", "discount")
-         .agg(pl.col("clicked").mean().alias("rate")))
-(ggplot(cells, aes("discount", "rate",
-                   colour="factor(personal)"))
- + geom_line() + geom_point())
+         .agg(rate=pl.col("clicked").mean()))
+(ggplot(cells)
+ + aes("discount", "rate",
+       colour="factor(personal)")
+ + geom_line() + geom_point()
+ + labs(colour="First name"))
 ```
 
-The plot was the last line, so here are the coefficients in pp:
+Control cell 3.51 %; the name adds +0.40 pp without the discount (p 0.183), the discount +1.59 pp with the generic subject line, and together they add +1.02 pp more (p 0.0165): the lines fan out (slide 23). With the discount the name adds 0.40 + 1.02 = +1.42 pp (slide 24).
 
 ```{python}
-(m.params * 100).round(2)          # in pp
+# the four cells: customers, click rate and unsubscribe rate (slide 23)
+(fa.group_by("personal", "discount")
+ .agg(n=pl.len(),
+      click_rate=pl.col("clicked").mean(),
+      unsub_rate=pl.col("unsubscribed").mean())
+ .sort("personal", "discount"))
 ```
 
-Each coefficient is a cell difference: the intercept is the control cell (3.51 %), `personal` the name without the discount (+0.40), `discount` the discount with the generic subject line (+1.59), and `personal:discount` the interaction (+1.02 pp).
+10,000 customers per cell. The first name with the discount has the highest click rate (6.52 %) and the fewest unsubscribes (0.24 %, against 0.34 % for the control).
+
+**The market as a moderator (optional, slide 27).** Does the interaction differ between Germany and Spain? The three-way term answers it.
 
 ```{python}
-# the four cells: customers, click rate and unsubscribe rate, and the SRM check (slide 23)
-fa_cells = (fa.group_by("personal", "discount")
-            .agg(pl.len().alias("n"),
-                 pl.col("clicked").mean().alias("click_rate"),
-                 pl.col("unsubscribed").mean().alias("unsub_rate"))
-            .sort("personal", "discount"))
-print("SRM p:", round(stats.chisquare(fa_cells["n"].to_list()).pvalue, 3))
-fa_cells
+# the 2 × 2 by market: the dummy spain and the three-way term
+fa = fa.with_columns(spain=(pl.col("country") == "ES").cast(pl.Int64))
+m3 = smf.ols("clicked ~ personal * discount * spain", data=fa.to_pandas()).fit()
+print((m3.params * 100).round(2))
+print(m3.pvalues.round(3))
 ```
 
-10,000 customers per cell (SRM p 1.000). The first name with the discount has the highest click rate (6.52 %) and the fewest unsubscribes (0.24 %).
-
-## Step 4: chance and power
-
-### A/A tests: what chance looks like
-
-Slides 15 and 17: we send the same e-mail (click rate 3.3 %) to two groups of 20,000, 2,000 times, and keep the gap B − A and whether the z-test says p < 0.05.
-
-```{python}
-# 2,000 simulated A/A tests (seed 7)
-rng = np.random.default_rng(7)
-gaps, significant = [], []
-for run in range(2000):
-    y = rng.random(40_000) < 0.033
-    a, b = y[:20_000].sum(), y[20_000:].sum()
-    gaps.append(100 * (b - a) / 20_000)
-    significant.append(proportions_ztest([a, b], [20_000, 20_000])[1] < 0.05)
-aa = pl.DataFrame({"gap_pp": gaps, "significant": significant})
-```
-
-```{python}
-# how often chance alone looks "significant", and how rare our +0.60 pp is
-print("share with p < 0.05:", aa["significant"].mean())
-print("SD of the gaps in pp:", round(aa["gap_pp"].std(), 3))
-print("share with a gap of 0.60 pp or more:", (aa["gap_pp"].abs() >= 0.6).mean())
-(ggplot(aa, aes("gap_pp")) + geom_histogram(binwidth=0.05) + geom_vline(xintercept=0.6, colour="blue")
- + labs(x="Difference B − A in 2,000 A/A tests (pp)", y="Number of tests"))
-```
-
-About 5 % of the A/A tests come out "significant" (5.9 %), the gaps scatter with an SD of 0.18 pp, and only 0.15 % reach 0.60 pp: our result is not chance.
-
-### Power and sample size
-
-Slide 16: the customers per version for three effect sizes from 3.3 %, with 80 % power at the 5 % level, rounded up.
-
-```{python}
-# customers per version for 3.3 % → 3.9 %, 3.6 % and 4.3 %
-for p1 in [0.039, 0.036, 0.043]:
-    need = NormalIndPower().solve_power(proportion_effectsize(p1, 0.033), alpha=0.05, power=0.8)
-    print(p1, np.ceil(need))
-```
-
-Half the effect needs about four times the customers (58,072 instead of 15,107). The power curve for +0.6 pp (`es` from Step 2):
-
-```{python}
-# power for 1,000 to 40,000 customers per version
-n_grid = np.arange(1_000, 40_001, 1_000)
-curve = pl.DataFrame({"n": n_grid, "power": NormalIndPower().power(es, nobs1=n_grid, alpha=0.05)})
-print(curve.filter(pl.col("n").is_in([2_000, 5_000, 10_000, 20_000, 40_000])))
-(ggplot(curve, aes("n", "power")) + geom_line() + geom_hline(yintercept=0.8, linetype="dashed")
- + labs(x="Customers per version", y="Power"))
-```
-
-With our 20,000 per version the test had 89.7 % power; with 2,000 it would have had only 17.5 %.
-
-## Step 5: does B work for everyone? Device as a moderator
-
-```{python}
-# customers, clicks and click rate by device and version (slide 18)
-device = (ab.group_by("device", "version")
-          .agg(pl.len().alias("n"),
-               pl.col("clicked").sum().alias("clicks"),
-               pl.col("clicked").mean().alias("click_rate"))
-          .sort("device", "version"))
-device
-```
-
-```{python}
-# customers, B − A in pp and the z-test of Step 2 within each device
-mob = device.filter(pl.col("device") == "mobile")
-desk = device.filter(pl.col("device") == "desktop")
-print("customers on mobile and desktop:", mob["n"].sum(), desk["n"].sum())
-print("mobile: B - A in pp", round((mob["click_rate"][1] - mob["click_rate"][0]) * 100, 2))
-print("desktop: B - A in pp", round((desk["click_rate"][1] - desk["click_rate"][0]) * 100, 2))
-print("p mobile:", round(proportions_ztest(mob["clicks"].to_list(), mob["n"].to_list())[1], 4))
-print("p desktop:", round(proportions_ztest(desk["clicks"].to_list(), desk["n"].to_list())[1], 4))
-```
-
-B adds +0.92 pp on mobile (3.33 % → 4.25 %, p 0.0002) and only +0.13 pp on desktop (p 0.66). Is that difference more than chance? A moderator is tested with a product term:
-
-```{python}
-# B × mobile in one regression: does the effect of B depend on the device?
-d = ab.with_columns(B=(pl.col("version") == "B").cast(pl.Int64),
-                    mobile=(pl.col("device") == "mobile").cast(pl.Int64))
-m_device = smf.ols("clicked ~ B * mobile", data=d.to_pandas()).fit()
-print("B:mobile in pp:", round(m_device.params["B:mobile"] * 100, 2))
-print("p:", round(m_device.pvalues["B:mobile"], 3))
-```
-
-B adds 0.79 pp more on mobile (p 0.038). A segment found after the test is a hypothesis: confirm it in a new test.
-
-## Step 6: the 2 × 2 by hand and the two-way ANOVA
-
-### By hand: simple effects, main effects, interaction
-
-Slide 24. A simple effect compares two cells within one level of the other factor, the main effect is the average of the two simple effects, and the interaction is their difference.
-
-```{python}
-# the effects from the four click rates of Step 3, in pp
-r00, r01, r10, r11 = fa_cells["click_rate"].to_list()   # personal, discount: 00, 01, 10, 11
-pl.DataFrame({
-    "effect": ["name, no discount", "name, with discount", "discount, generic", "discount, first name",
-               "main effect name", "main effect discount", "interaction"],
-    "pp": [r10 - r00, r11 - r01, r01 - r00, r11 - r10,
-           (r10 - r00 + r11 - r01) / 2, (r01 - r00 + r11 - r10) / 2, (r11 - r01) - (r10 - r00)],
-}).with_columns((pl.col("pp") * 100).round(2))
-```
-
-The name adds +0.40 pp without and +1.42 pp with the discount; the interaction, +1.02 pp, is the same whichever factor we start from. Report the simple effects: the main effect of the name (+0.91 pp) fits neither e-mail.
-
-### Regression and two-way ANOVA
-
-Slide 25: one model, two read-outs. The regression table gives each cell difference with its p-value; the two-way ANOVA (`typ=2`) tests the two main effects and the interaction.
-
-```{python}
-# the model of Step 3: coefficients with p-values, then the two-way ANOVA
-print(m.summary())
-anova_lm(m, typ=2)
-```
-
-The interaction has p 0.017 in both read-outs (t = 2.40, F = 5.75 = 2.40²); F for the main effects is 18.32 (name) and 97.56 (discount).
-
-```{python}
-# effect coding (−0.5 / +0.5): the coefficients are the main effects; SEs in pp
-fa_e = fa.with_columns(pe=pl.col("personal") - 0.5, de=pl.col("discount") - 0.5)
-m_e = smf.ols("clicked ~ pe * de", data=fa_e.to_pandas()).fit()
-print((m_e.params * 100).round(2))
-(m_e.bse * 100).round(2)
-```
-
-With effect coding the main effects are +0.91 pp (name) and +2.10 pp (discount). The SE of the interaction (0.43 pp) is twice that of a main effect (0.21 pp), so an interaction of the same size needs about four times the customers (slide 28).
-
-## Step 7: the logit reads the interaction differently
-
-Slide 26: the same model as a logit. Its coefficients are on the log-odds scale; `np.exp` turns them into odds ratios.
-
-```{python}
-# the 2 × 2 as a logit: log-odds coefficients and odds ratios
-lg = smf.logit("clicked ~ personal * discount", data=fa.to_pandas()).fit(disp=0)
-print(np.exp(lg.params).round(2))   # odds ratios
-lg.summary()
-```
-
-```{python}
-# the four cells on the log-odds scale: log(rate / (1 - rate))
-fa_cells.with_columns(log_odds=(pl.col("click_rate") / (1 - pl.col("click_rate"))).log())
-```
-
-In log-odds the name adds 0.11 without and 0.26 with the discount, a product term of 0.149 (OR 1.16, p 0.124); in click rates it is +1.02 pp (p 0.017). The discount raises the base rate, so the same odds lift is worth more pp: read interactions in pp, the scale of the decision.
-
-## Step 8: does the interaction differ by market?
-
-```{python}
-# the regression of Step 3 in each market: the interaction in pp (slide 27)
-germany = fa.filter(pl.col("country") == "DE").to_pandas()
-spain = fa.filter(pl.col("country") == "ES").to_pandas()
-m_de = smf.ols("clicked ~ personal * discount", data=germany).fit()
-m_es = smf.ols("clicked ~ personal * discount", data=spain).fit()
-print("Germany:", round(m_de.params["personal:discount"] * 100, 2), "pp, p",
-      round(m_de.pvalues["personal:discount"], 3))
-print("Spain:", round(m_es.params["personal:discount"] * 100, 2), "pp, p",
-      round(m_es.pvalues["personal:discount"], 3))
-```
-
-"Significant in Spain, not in Germany" is not a test of a difference. The three-way term tests it directly:
-
-```{python}
-# the difference of the interaction, Spain − Germany
-m_three = smf.ols("clicked ~ personal * discount * C(country)", data=fa.to_pandas()).fit()
-term = "personal:discount:C(country)[T.ES]"
-print("Spain - Germany in pp:", round(m_three.params[term] * 100, 2))
-print("p:", round(m_three.pvalues[term], 3))
-```
-
-The gap of +1.36 pp has p 0.110: within chance. The data were simulated with the same interaction (+1.0 pp) in both markets; still, repeat a test in each market before a roll-out.
-
-```{python}
-# click rate per cell and market, one panel per market
-markets = (fa.group_by("country", "personal", "discount")
-           .agg(pl.col("clicked").mean().alias("rate"))
-           .sort("country", "personal", "discount"))
-print(markets)
-(ggplot(markets, aes("discount", "rate", colour="factor(personal)"))
- + geom_line() + geom_point() + facet_wrap("country")
- + labs(x="Discount", y="Click rate", colour="First name"))
-```
+The last line, `personal:discount:spain`: Spain's interaction is 1.36 pp larger than Germany's, p 0.110: within chance. "Significant in Spain, not in Germany" is not a test of a difference; this term is.
 
 ## Appendix: open data for practice
 
