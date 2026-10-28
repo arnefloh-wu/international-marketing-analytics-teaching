@@ -1,0 +1,118 @@
+---
+title: "In-class exercise: the operator's retention e-mail"
+subtitle: "Experiments and A/B testing · split checks, effects in pp, sample size and a 2 × 2 on simulated e-mail data · International Marketing Analytics"
+format:
+  html:
+    embed-resources: true
+    toc: true
+execute:
+  warning: false
+---
+
+The mobile operator of the churn deck has tested its retention e-mail in Germany and Spain. The CRM manager asks: **did the first name work in both markets, how big must the next test be, and which e-mail should we send?**
+
+| Step | What | Time |
+|---|---|---|
+| 1 | **Coding exercise** in pairs: Tasks 1 to 4 below with the packages (polars, statsmodels, scipy, plotnine, great_tables) | 35 minutes |
+| 2 | **Plenary**: the answers | 5 minutes |
+| 3 | **Posit Assistant**: the same tasks with the assistant; compare its code, numbers and wording with yours (last section) | 10 minutes |
+
+Use `ab_testing.qmd` as a template: each task names the step whose code you can reuse. Deliverable: one slide per pair with the interaction plot and two sentences for the CRM manager.
+
+## The data
+
+Two simulated experiments with 40,000 customers each, both randomised within each country. `data/abtest/email_ab.csv` is the A/B test of the subject line: `country` (DE, ES), `device` (mobile, desktop), `version` (A = generic subject line, the control; B = with the customer's first name, the variant), `clicked` (1 = clicked the link to the loyalty offers) and `unsubscribed` (1 = left the mailing list). `data/abtest/email_factorial.csv` is the 2 × 2 test of the next campaign, with the same `country`, `device`, `clicked` and `unsubscribed` columns and two factors: `personal` (0 = generic, 1 = first name in the subject line) and `discount` (0 = no discount, 1 = 10 % off the next bill). This file sits in `sessions/01-foundations/`, so it reads the data two folders up (`../../data/...`). Run the first cell as it is.
+
+```{python}
+import numpy as np
+import polars as pl
+import statsmodels.formula.api as smf
+from great_tables import GT
+from plotnine import aes, geom_line, geom_point, ggplot, labs
+from scipy import stats
+from statsmodels.stats.power import NormalIndPower
+from statsmodels.stats.proportion import (confint_proportions_2indep, proportion_effectsize,
+                                          proportions_ztest)
+
+ab = pl.read_csv("../../data/abtest/email_ab.csv")
+fa = pl.read_csv("../../data/abtest/email_factorial.csv")
+```
+
+## Task 1: check
+
+Before any result, check the split (Step 1). For each market (DE, ES): how many customers got each version, what is the SRM p-value of the split, and what share of the customers read on mobile in each version? Is the split as planned, and are the groups alike?
+
+Tip: `ab.group_by("country", "version").agg(pl.len(), (pl.col("device") == "mobile").mean())`; for the SRM test of one market, `stats.chisquare([n_A, n_B]).pvalue`.
+
+```{python}
+# your code here
+```
+
+*Your answer:*
+
+## Task 2: test
+
+In Germany and in Spain separately: the click rate of version A and version B, the difference B − A in percentage points (pp) with its 95 % confidence interval (CI), and the p-value (Step 2). Does the effect of the first name differ between the markets? Test it with one regression, `smf.ols("clicked ~ B * C(country)", ...)`, where B = 1 for version B (Step 5 uses the same idea for the device): which coefficient answers the question?
+
+Tip: pass B first to `proportions_ztest([x_B, x_A], [n_B, n_A])` and `confint_proportions_2indep(x_B, n_B, x_A, n_A)`, so you get B − A; multiply by 100 for pp. For the regression, `ab.with_columns(B=(pl.col("version") == "B").cast(pl.Int64)).to_pandas()`.
+
+```{python}
+# your code here
+```
+
+*Your answer:*
+
+## Task 3: plan
+
+The next subject-line test expects a click rate of 3.3 % with version A and 3.8 % with version B. How many customers per version does it need for 80 % power at α = 0.05? What is the power with 10,000 customers per version (Step 2)? Write one sentence for the CRM manager on why "just send it to 5,000 each" is risky.
+
+Tip: `es = proportion_effectsize(0.038, 0.033)`, then `NormalIndPower().solve_power(es, alpha=0.05, power=0.8)` (round up) and `NormalIndPower().power(es, nobs1=10_000, alpha=0.05)`.
+
+```{python}
+# your code here
+```
+
+*Your answer:*
+
+## Task 4: the 2 × 2
+
+With `fa` (email_factorial.csv): the table of the four click rates (rows generic / first name, columns no discount / 10 % discount), the interaction plot, and `smf.ols("clicked ~ personal * discount", ...)` with the coefficients in pp (Steps 3 and 6). What is the simple effect of the first name without and with the discount, how large is the interaction, and which e-mail should the operator send? Check the unsubscribe rate of each cell as the guardrail.
+
+Tip: `cells = fa.group_by("personal", "discount").agg(pl.col("clicked").mean().alias("rate"), pl.col("unsubscribed").mean().alias("unsub"))`; the plot is `ggplot(cells.to_pandas(), aes("discount", "rate", colour="factor(personal)")) + geom_line() + geom_point()`; for the coefficients in pp, `100 * m.params` and `100 * m.conf_int()`.
+
+```{python}
+# your code here
+```
+
+*Your answer:*
+
+## Extra: done early?
+
+Does the interaction differ between Germany and Spain? Fit `smf.ols("clicked ~ personal * discount * C(country)", ...)` on `fa` and read the three-way term `personal:discount:C(country)[T.ES]` (Step 8). Why is "significant in Spain, not in Germany" not enough to say that the markets differ?
+
+```{python}
+# your code here
+```
+
+*Your answer:*
+
+## Then: the same tasks with Posit Assistant
+
+After your own solution and the plenary: ask Posit Assistant and compare.
+
+1. Keep the first code cell run, so Posit Assistant sees `ab` and `fa`.
+2. Open the chat: the Posit Assistant icon in the activity bar, or Ctrl/Cmd + Shift + P → *View: Show Posit Assistant*.
+3. Type `@ab_exercise.qmd`, then ask for **one task per prompt**, naming the packages and the output. The prompts of the slide:
+
+   > @ab_exercise.qmd Task 1. Check the split of email_ab.csv in each country: counts, SRM p-value and the share on mobile per version.
+
+   > Task 2. Estimate B − A in Germany and in Spain in pp with a 95 % CI. Do the markets differ, and how would you test that?
+
+   > Task 3. How many customers per version detect 3.3 % → 3.8 % with 80 % power? Explain power in one sentence for a manager.
+
+   > Task 4. Fit clicked ~ personal * discount. Explain each coefficient in pp and recommend one e-mail; check the unsubscribes too.
+
+4. It asks before it runs code: **Accept**, **Decline** or reply. Read every edit first. Stay in Normal mode (never `/yolo`).
+5. Compare its code, numbers and wording with yours. Typical slips: a relative lift in % reported as pp, the sign A − B instead of B − A, the `personal` coefficient read as the main effect of the first name, the product term of a logit read as "no interaction", the split check forgotten.
+
+*Where did Posit Assistant differ from your solution, and who was right?*
