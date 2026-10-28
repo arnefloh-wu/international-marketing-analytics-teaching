@@ -1,0 +1,124 @@
+---
+title: "In-class exercise: forecasting café sales"
+subtitle: "Forecasting and time series · simple forecasts by hand, a holdout test and a 2019 forecast on real ABS data · International Marketing Analytics"
+format:
+  html:
+    embed-resources: true
+    toc: true
+execute:
+  warning: false
+---
+
+A café and restaurant chain in Australia plans its staff and stock for the coming year. Its planner asks: **which method forecasts café sales best, what should we expect for 2019, and how sure can we be?**
+
+| Step | What | Time |
+|---|---|---|
+| 1 | **Coding exercise** in pairs: Tasks 1 to 4 below with the packages (polars, statsmodels, plotnine, great_tables) | 35 minutes |
+| 2 | **Plenary**: the answers | 5 minutes |
+| 3 | **Posit Assistant**: the same tasks with the assistant; compare its code, numbers and wording with yours (last section) | 10 minutes |
+
+Use `forecasting.qmd` as a template: each task names the step whose code you can reuse. Deliverable: one slide per pair with the 2019 forecast chart and two sentences for the café chain's planner.
+
+## The data
+
+`data/forecasting/aus_cafes_retail.csv`: the monthly turnover of cafés, restaurants and takeaway food services in Australia, in AUD million (AUD m), not seasonally adjusted, April 1982 to April 2019 (source: ABS, Retail Trade, Australia, cat. no. 8501.0, Table 11; CC BY 4.0). Two columns: `month` (the first day of the month) and `value` (turnover, AUD m). As in the deck, we use January 2009 to December 2018 (120 months), keep 2017–2018 back as the holdout and use January–April 2019, the last four months in the file, as a check of the 2019 forecast. This file sits in `sessions/01-foundations/`, so it reads the data two folders up (`../../data/...`). Run the first cell as it is.
+
+```{python}
+import warnings
+
+import numpy as np
+import polars as pl
+import statsmodels.formula.api as smf
+import statsmodels.tsa.api as tsa
+from great_tables import GT
+from plotnine import aes, geom_line, geom_point, geom_ribbon, ggplot, labs, theme_minimal
+from statsmodels.stats.stattools import durbin_watson
+
+warnings.filterwarnings("ignore")   # optimiser messages of the smoothing models
+
+BOOKINGS = [20, 24, 22, 26, 27, 31]   # Task 1: a café's table bookings, weeks 1-6
+
+cafes = (pl.read_csv("../../data/forecasting/aus_cafes_retail.csv", try_parse_dates=True))
+df = cafes.filter(pl.col("month").dt.year().is_between(2009, 2018))
+y = df["value"].to_numpy()
+train, test = y[:-24], y[-24:]      # holdout 2017-2018
+```
+
+## Task 1: by hand
+
+A café's weekly online table bookings, weeks 1–6 (invented round numbers): 20, 24, 22, 26, 27, 31. With a calculator, forecast week 7 with five methods: naive (no change), drift (same change), the mean, the moving average of the last 3 weeks and simple exponential smoothing with α 0.5 (start: level = first value; write down the level of every week). Then pretend weeks 5 and 6 are unknown: forecast them from week 4 with naive, drift and the mean, and compute each method's MAE. Which method wins, and why? (Steps 4 and 5; deck slides 11–13 and 19.)
+
+Tip: drift = last value + (last − first) / (n − 1) for each week ahead; level = 0.5 × value + 0.5 × previous level; error = actual − forecast, MAE = the mean of the errors without their signs. To check in Python, copy `ses_levels()` from Step 4 and use `BOOKINGS`.
+
+```{python}
+# your code here (optional check)
+```
+
+*Your answer:*
+
+## Task 2: look
+
+Plot café sales 2009–2018 with plotnine (Step 1). Describe trend and season in two sentences: how much did sales grow from 2009 to 2018, and how large is the December peak compared with clothing (December index 1.59)? Then run the ADF test on the levels and on the first difference (Step 6): which of the two is stationary?
+
+Tip: `tsa.seasonal_decompose(y, model="multiplicative", period=12).seasonal[:12]` gives the seasonal index of January to December; `tsa.adfuller(y)[1]` and `tsa.adfuller(np.diff(y))[1]` give the ADF p-values (small p, below 0.05 = stationary).
+
+```{python}
+# your code here
+```
+
+*Your answer:*
+
+## Task 3: test
+
+On the 2017–2018 holdout, compare five methods: the seasonal naive, Holt-Winters (multiplicative), SARIMA(0,1,1)(0,1,1)12 on log sales, the regression on log sales with trend + month dummies, and the same regression in levels (`"value ~ t + C(m)"`). Give MAE, RMSE and MAPE in one great_tables table sorted by MAE (Steps 2 and 3). Which method wins, and is it the same winner as for clothing? Do all methods beat the seasonal naive?
+
+Tip: copy the code of Steps 2 and 3; `train` and `test` of the first cell are already the café series. Add `fc["reg"] = smf.ols("value ~ t + C(m)", data=d[:-24]).fit().predict(d[-24:])` after the log regression.
+
+```{python}
+# your code here
+```
+
+*Your answer:*
+
+## Task 4: forecast
+
+Refit the winner of Task 3 on all 120 months and forecast 2019 with a 95 % band; do the same with SARIMA. Plot 2016–2019 with the bands and the actual January–April 2019 (in the file, after December 2018). How many of the four months fall inside each band? Compute the Durbin–Watson statistic of the regression's residuals: which band would you use to plan staff and stock, and why? (Steps 8 and 9.)
+
+Tip: for the regression, the 2019 frame needs `t` = 121 … 132 and `m` = 1 … 12; `m.get_prediction(new).summary_frame(alpha=0.05)` gives `mean`, `obs_ci_lower` and `obs_ci_upper`. For SARIMA, `sar.get_forecast(12).conf_int(alpha=0.05)` is on the log scale, so take `np.exp()` of it and of `predicted_mean`. `durbin_watson(m.resid)`: 2 = no autocorrelation.
+
+```{python}
+# your code here
+```
+
+*Your answer:*
+
+## Extra (done early?)
+
+Fit ETS(M,A,M) with `tsa.ETSModel(train, error="mul", trend="add", seasonal="mul", seasonal_periods=12).fit(disp=False)`, forecast the 24 holdout months with `.forecast(24)` and add it to the table of Task 3 (Step 7). Does it beat the regression?
+
+```{python}
+# your code here
+```
+
+*Your answer:*
+
+## Then: the same tasks with Posit Assistant
+
+After your own solution and the plenary: ask Posit Assistant and compare.
+
+1. Keep the first code cell run, so Posit Assistant sees `cafes`, `df`, `y`, `train`, `test` and `BOOKINGS`.
+2. Open the chat: the Posit Assistant icon in the activity bar, or Ctrl/Cmd + Shift + P → *View: Show Posit Assistant*.
+3. Type `@forecasting_exercise.qmd`, then ask for **one task per prompt**, naming the packages and the output. The prompts of the slide:
+
+   > @forecasting_exercise.qmd Task 1. Café bookings 20, 24, 22, 26, 27, 31: naive, drift, mean, moving average (3) and SES (α 0.5) for week 7, step by step.
+
+   > Task 2. Plot aus_cafes_retail.csv for 2009-2018 with plotnine. Describe trend and season; run the ADF test on levels and on the first difference.
+
+   > Task 3. Hold out 2017-2018. Compare seasonal naive, Holt-Winters, SARIMA and two regressions by MAE, RMSE and MAPE in a great_tables table.
+
+   > Task 4. Forecast 2019 with the best method and with SARIMA, 95 % bands. Which band would you trust for stock planning, and why?
+
+4. It asks before it runs code: **Accept**, **Decline** or reply. Read every edit first. Stay in Normal mode (never `/yolo`).
+5. Compare its code, numbers and wording with yours. Typical slips: a random train/test split instead of the last 24 months, the log forecast not transformed back with `np.exp()`, the seasonal naive misaligned (it must repeat the last 12 training months), accuracy measured on the training months, the regression band trusted although its errors are autocorrelated.
+
+*Where did Posit Assistant differ from your solution, and who was right?*
