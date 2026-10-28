@@ -48,7 +48,7 @@ train, test = y[:-24], y[-24:]      # holdout 2017-2018
 
 A café's weekly online table bookings, weeks 1–6 (invented round numbers): 20, 24, 22, 26, 27, 31. With a calculator, forecast week 7 with five methods: naive (no change), drift (same change), the mean, the moving average of the last 3 weeks and simple exponential smoothing with α 0.5 (start: level = first value; write down the level of every week). Then pretend weeks 5 and 6 are unknown: forecast them from week 4 with naive, drift and the mean, and compute each method's MAE. Which method wins, and why? (Steps 4 and 5; deck slides 11–13 and 19.)
 
-Tip: drift = last value + (last − first) / (n − 1) for each week ahead; level = 0.5 × value + 0.5 × previous level; error = actual − forecast, MAE = the mean of the errors without their signs. To check in Python, copy `ses_levels()` from Step 4 and use `BOOKINGS`.
+Tip: drift = last value + (last − first) / (n − 1) for each week ahead; level = 0.5 × value + 0.5 × previous level; error = actual − forecast, MAE = the mean of the errors without their signs. To check in Python, use the statsmodels call of Step 4 with `BOOKINGS`: `tsa.SimpleExpSmoothing(BOOKINGS, initialization_method="known", initial_level=20).fit(smoothing_level=0.5, optimized=False)`, then `.level` (the level of every week) and `.forecast(1)` (week 7).
 
 ```{python}
 # your code here (optional check)
@@ -72,7 +72,7 @@ Tip: `tsa.seasonal_decompose(y, model="multiplicative", period=12).seasonal[:12]
 
 On the 2017–2018 holdout, compare five methods: the seasonal naive, Holt-Winters (multiplicative), SARIMA(0,1,1)(0,1,1)12 on log sales, the regression on log sales with trend + month dummies, and the same regression in levels (`"value ~ t + C(m)"`). Give MAE, RMSE and MAPE in one great_tables table sorted by MAE (Steps 2 and 3). Which method wins, and is it the same winner as for clothing? Do all methods beat the seasonal naive?
 
-Tip: copy the code of Steps 2 and 3; `train` and `test` of the first cell are already the café series. Add `fc["reg"] = smf.ols("value ~ t + C(m)", data=d[:-24]).fit().predict(d[-24:])` after the log regression.
+Tip: copy the code of Steps 2 and 3; `train` and `test` of the first cell are already the café series. Add `fc["reg"] = smf.ols("value ~ t + C(m)", data=d[:-24]).fit().predict(d[-24:])` after the log regression; the great_tables table sorted by MAE is the one of Step 7.
 
 ```{python}
 # your code here

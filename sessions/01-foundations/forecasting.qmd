@@ -85,7 +85,7 @@ print("theta, Theta:", sar.params[:2].round(3))
 
 ## Step 3: regression on log sales and the accuracy table
 
-The code of slide 33. `t` counts the months 1 … 120 and `C(m)` turns the month number into 11 dummies (January is the baseline); the loop prints MAE, RMSE and MAPE (slide 19) for each method.
+The code of slide 33. `t` counts the months 1 … 120 and `C(m)` turns the month number into 11 dummies (January is the baseline). `pl.DataFrame(fc)` puts the four forecasts side by side, one column per method; `pl.all()` means "every column", so each line computes one measure of slide 19 for all methods at once. `a` holds the absolute errors |actual − forecast|; their mean, `a.mean()`, is the MAE; RMSE squares them, MAPE divides them by the actual.
 
 ```{python}
 import statsmodels.formula.api as smf
@@ -97,23 +97,22 @@ reg = smf.ols("np.log(value) ~ t + C(m)",
               data=d[:-24]).fit()
 fc["reg_log"] = np.exp(reg.predict(d[-24:]))
 
-for k, f in fc.items():
-    e = test - np.asarray(f)
-    mae = np.mean(np.abs(e))
-    rmse = np.sqrt(np.mean(e ** 2))
-    mape = 100 * np.mean(np.abs(e) / test)
-    print(k, round(mae, 1), round(rmse, 1),
-          round(mape, 1))
+f = pl.DataFrame(fc)  # a column per method
+a = f.select((pl.all() - test).abs())
+rmse = a.select((pl.all() ** 2).mean().sqrt())
+mape = a.select(pl.all() / test).mean() * 100
+acc = pl.concat([a.mean(), rmse, mape])
+acc.select(pl.all().round(1))  # MAE RMSE MAPE
 ```
 
-How to read it: only the log regression (MAE 54.5 AUD m) beats the seasonal naive (67.2); SARIMA (94.9) and Holt-Winters (96.6) do not. Step 7 adds eleven more methods.
+How to read it: the three rows are MAE, RMSE and MAPE (%). Only the log regression (MAE 54.5 AUD m) beats the seasonal naive (67.2); SARIMA (94.9) and Holt-Winters (96.6) do not. Step 7 adds eleven more methods.
 
 ## Step 4: simple forecasts by hand
 
 **The phone shop.** The by-hand forecasts of Part 2 (slides 11–14): new contracts in weeks 1–8; we forecast week 9 with naive (the last value), drift (the last value + the average change), the mean and the moving average of the last 3 weeks.
 
 ```{python}
-# the two shops (20 rows) and four forecasts for week 9
+# the two shops (20 rows) and four forecasts of week 9
 hand = pl.read_csv("../../data/forecasting/hand_examples.csv")
 phone = hand.filter(pl.col("example") == "contracts")["value"].to_numpy()
 slope = (phone[-1] - phone[0]) / (len(phone) - 1)            # the average change per week
@@ -123,19 +122,18 @@ print("mean:", phone.sum(), "/ 8 =", phone.mean(), " moving average (3):", phone
 hand
 ```
 
-Simple exponential smoothing (slide 13): level = α × value + (1 − α) × old level, starting with the first value; the forecast is the last level.
+Simple exponential smoothing (slide 13): level = α × value + (1 − α) × old level, starting with the first value; the forecast is the last level. statsmodels does it with a fixed α (`optimized=False`) and the first value as the start (`initialization_method="known"`); `.level` is the level after each week, `.fittedvalues` the forecast made the week before.
 
 ```{python}
-# simple exponential smoothing, week by week
-def ses_levels(y, alpha):
-    levels = [float(y[0])]                       # first level = first value
-    for v in y[1:]:
-        levels.append(alpha * v + (1 - alpha) * levels[-1])
-    return levels
-
-print("alpha 0.2:", np.round(ses_levels(phone, 0.2), 2))
-print("alpha 1 (= naive):", ses_levels(phone, 1)[-1])
-pl.DataFrame({"week": range(1, 9), "contracts": phone, "level": ses_levels(phone, 0.5)})
+# simple exponential smoothing with alpha 0.5, 0.2 and 1
+model = tsa.SimpleExpSmoothing(phone, initialization_method="known", initial_level=phone[0])
+ses5 = model.fit(smoothing_level=0.5, optimized=False)
+ses2 = model.fit(smoothing_level=0.2, optimized=False)
+ses1 = model.fit(smoothing_level=1, optimized=False)
+print("forecast week 9, alpha 0.5:", ses5.forecast(1))
+print("alpha 0.2 levels:", ses2.level.round(2), " forecast:", ses2.forecast(1).round(2))
+print("alpha 1 (= naive):", ses1.forecast(1))
+pl.DataFrame({"week": range(1, 9), "contracts": phone, "level": ses5.level, "forecast": ses5.fittedvalues})
 ```
 
 The trend regression (slide 14): b1 = sum (t − t̄)(y − ȳ) / sum (t − t̄)², then b0 = ȳ − b1 × t̄; `smf.ols` gives the same.
@@ -185,13 +183,15 @@ reg_q.params.round(2)
 The holdout of Part 3 (slides 18–20): fit on weeks 1–5, forecast weeks 6–8 and compare with what happened. The error is actual − forecast.
 
 ```{python}
-# forecasts for weeks 6-8 from weeks 1-5
+# forecasts of weeks 6-8 from weeks 1-5
 tr = phone[:5]
 fit5 = smf.ols("value ~ t", data=weeks[:5]).fit()
+ses_tr = tsa.SimpleExpSmoothing(tr, initialization_method="known", initial_level=tr[0]).fit(
+    smoothing_level=0.5, optimized=False)
 hold = pl.DataFrame({
     "week": [6, 7, 8], "actual": phone[5:],
     "naive": tr[-1], "drift": tr[-1] + np.array([1, 2, 3]) * (tr[-1] - tr[0]) / 4,
-    "mean": tr.mean(), "ma3": tr[-3:].mean(), "ses": ses_levels(tr, 0.5)[-1],
+    "mean": tr.mean(), "ma3": tr[-3:].mean(), "ses": ses_tr.forecast(1)[0],
     "trend regression": fit5.predict(weeks[5:]).to_numpy()})
 print("trend regression, weeks 1-5: b0, b1 =", fit5.params.round(2).to_list())
 hold
