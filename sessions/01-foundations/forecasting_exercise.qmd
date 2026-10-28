@@ -46,7 +46,7 @@ train, test = y[:-24], y[-24:]      # holdout 2017-2018
 
 ## Task 1: by hand
 
-A café's weekly online table bookings, weeks 1–6 (invented round numbers): 20, 24, 22, 26, 27, 31. With a calculator, forecast week 7 with five methods: naive (no change), drift (same change), the mean, the moving average of the last 3 weeks and simple exponential smoothing with α 0.5 (start: level = first value; write down the level of every week). Then pretend weeks 5 and 6 are unknown: forecast them from week 4 with naive, drift and the mean, and compute each method's MAE. Which method wins, and why? (Steps 4 and 5; deck slides 11–13 and 19.)
+A café's weekly online table bookings, weeks 1–6 (invented round numbers): 20, 24, 22, 26, 27, 31. With a calculator, forecast week 7 with five methods: naive (no change), drift (same change), the mean, the moving average of the last 3 weeks and simple exponential smoothing with α 0.5 (start: level = first value; write down the level of every week). Then pretend weeks 5 and 6 are unknown: forecast them from week 4 with naive, drift and the mean, and compute each method's MAE. Which method wins, and why? (Steps 4 and 5; deck slides 12–15 and 22.)
 
 Tip: drift = last value + (last − first) / (n − 1) for each week ahead; level = 0.5 × value + 0.5 × previous level; error = actual − forecast, MAE = the mean of the errors without their signs. To check in Python, use the statsmodels call of Step 4 with `BOOKINGS`: `tsa.SimpleExpSmoothing(BOOKINGS, initialization_method="known", initial_level=20).fit(smoothing_level=0.5, optimized=False)`, then `.level` (the level of every week) and `.forecast(1)` (week 7).
 

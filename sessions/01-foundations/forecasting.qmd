@@ -9,7 +9,7 @@ execute:
   warning: false
 ---
 
-The Python companion to the deck. Steps 1–3 are the code of slides 31–33; Steps 4–9 follow the deck from the two small shops (Parts 2 and 3) to the real series (Part 4). The file sits in `sessions/01-foundations/`, so it reads the data two folders up (`../../data/forecasting/`):
+The Python companion to the deck. Steps 1–3 are the code of slides 35–37; Steps 4–9 follow the deck from the two small shops (Parts 2 and 3) to the real series (Part 4), with the stationarity examples of Part 1 in Step 6. The file sits in `sessions/01-foundations/`, so it reads the data two folders up (`../../data/forecasting/`):
 
 - `hand_examples.csv`: the two invented shops. Column `example` is `contracts` (a phone shop, new mobile contracts per week, weeks 1–8) or `webshop` (a chocolate web shop, sales per quarter in k EUR, quarters 1–12); `period` is the week or quarter, `value` the number.
 - `aus_clothing_retail.csv`: clothing sales in Australia, one row per month from April 1982 to April 2019 (`month`, `value` = turnover in AUD m, not seasonally adjusted). Source: ABS, Retail Trade, Australia (8501.0), Table 11; CC BY 4.0. We use 2009–2018: 2009–2016 to fit, 2017–2018 as the holdout.
@@ -18,7 +18,7 @@ The in-class exercise, `forecasting_exercise.qmd`, reuses these steps on the caf
 
 ## Step 1: load, split and plot
 
-The code of slide 31. The filter keeps 2009–2018; the rows are in time order, so the last 24 months are the holdout (never split a time series at random).
+The code of slide 35. The filter keeps 2009–2018; the rows are in time order, so the last 24 months are the holdout (never split a time series at random).
 
 ```{python}
 import polars as pl
@@ -36,7 +36,7 @@ train, test = y[:-24], y[-24:]   # 2017-18
  + geom_line())
 ```
 
-The split, the lowest and highest month, and the sales per year: the year totals show the trend without the season, flat until 2012 (a cycle) and then about +4 % a year (slides 22 and 23).
+The split, the lowest and highest month, and the sales per year: the year totals show the trend without the season, flat until 2012 (a cycle) and then about +4 % a year (slides 25 and 27).
 
 ```{python}
 # the split, the extremes and the year totals
@@ -53,7 +53,7 @@ years
 
 ## Step 2: Holt-Winters and SARIMA
 
-The code of slide 32. `seasonal="mul"` is the multiplicative Holt-Winters model of slide 25; `np.resize(train[-12:], 24)` repeats the last training year twice (the seasonal naive); SARIMA works on log sales, and `np.exp()` brings its forecast back to AUD m.
+The code of slide 36. `seasonal="mul"` is the multiplicative Holt-Winters model of slide 29; `np.resize(train[-12:], 24)` repeats the last training year twice (the seasonal naive); SARIMA works on log sales, and `np.exp()` brings its forecast back to AUD m.
 
 ```{python}
 import numpy as np
@@ -73,7 +73,7 @@ fc = {"snaive": np.resize(train[-12:], 24),
       "sarima": np.exp(sar.forecast(24))}
 ```
 
-The fitted weights of Holt-Winters (α level, β trend, γ season; γ = 0 means it keeps the seasonal pattern it started with) and SARIMA's two memory terms (θ last month, Θ last year), as in the table of slide 32:
+The fitted weights of Holt-Winters (α level, β trend, γ season; γ = 0 means it keeps the seasonal pattern it started with) and SARIMA's two memory terms (θ last month, Θ last year), as in the table of slide 36:
 
 ```{python}
 # fitted weights and terms
@@ -85,7 +85,7 @@ print("theta, Theta:", sar.params[:2].round(3))
 
 ## Step 3: regression on log sales and the accuracy table
 
-The code of slide 33. `t` counts the months 1 … 120 and `C(m)` turns the month number into 11 dummies (January is the baseline). `pl.DataFrame(fc)` puts the four forecasts side by side, one column per method; `pl.all()` means "every column", so each line computes one measure of slide 19 for all methods at once. `a` holds the absolute errors |actual − forecast|; their mean, `a.mean()`, is the MAE; RMSE squares them, MAPE divides them by the actual.
+The code of slide 37. `t` counts the months 1 … 120 and `C(m)` turns the month number into 11 dummies (January is the baseline). `pl.DataFrame(fc)` puts the four forecasts side by side, one column per method; `pl.all()` means "every column", so each line computes one measure of slide 22 for all methods at once. `a` holds the absolute errors |actual − forecast|; their mean, `a.mean()`, is the MAE; RMSE squares them, MAPE divides them by the actual.
 
 ```{python}
 import statsmodels.formula.api as smf
@@ -109,7 +109,7 @@ How to read it: the three rows are MAE, RMSE and MAPE (%). Only the log regressi
 
 ## Step 4: simple forecasts by hand
 
-**The phone shop.** The by-hand forecasts of Part 2 (slides 11–14): new contracts in weeks 1–8; we forecast week 9 with naive (the last value), drift (the last value + the average change), the mean and the moving average of the last 3 weeks.
+**The phone shop.** The by-hand forecasts of Part 2 (slides 12–16): new contracts in weeks 1–8; we forecast week 9 with naive (the last value), drift (the last value + the average change), the mean and the moving average of the last 3 weeks.
 
 ```{python}
 # the two shops (20 rows) and four forecasts of week 9
@@ -122,7 +122,30 @@ print("mean:", phone.sum(), "/ 8 =", phone.mean(), " moving average (3):", phone
 hand
 ```
 
-Simple exponential smoothing (slide 13): level = α × value + (1 − α) × old level, starting with the first value; the forecast is the last level. statsmodels does it with a fixed α (`optimized=False`) and the first value as the start (`initialization_method="known"`); `.level` is the level after each week, `.fittedvalues` the forecast made the week before.
+The same forecasts week by week, as in the tables of slides 12 and 13: `shift(1)` moves each value one week down, so the naive forecast of a week is the week before; `rolling_mean(3).shift(1)` is the mean of the 3 weeks before. The error is actual − forecast: for naive it is the weekly change, and every error of the moving average is positive (it lags behind the trend).
+
+```{python}
+# naive and moving average (3) week by week; error = actual - forecast
+weekly = (hand.filter(pl.col("example") == "contracts")
+          .select(week=pl.col("period"), contracts=pl.col("value"))
+          .with_columns(naive=pl.col("contracts").shift(1),
+                        ma3=pl.col("contracts").rolling_mean(3).shift(1).round(2))
+          .with_columns(naive_error=pl.col("contracts") - pl.col("naive"),
+                        ma3_error=(pl.col("contracts") - pl.col("ma3")).round(2)))
+print("mean naive error = drift slope:", weekly["naive_error"].mean())
+weekly
+```
+
+A rolling average can also smooth the series (slide 14). `center=True` puts the average of weeks 1–3 into week 2: it looks back and forward and shows the trend. To forecast we may only look back, so the same average becomes the forecast of week 4.
+
+```{python}
+# rolling average of 3 weeks: centred to smooth, shifted to forecast
+weekly.select("week", "contracts",
+              smooth=pl.col("contracts").rolling_mean(window_size=3, center=True).round(2),
+              forecast=pl.col("contracts").rolling_mean(window_size=3).shift(1).round(2))
+```
+
+Simple exponential smoothing (slide 15): level = α × value + (1 − α) × old level, starting with the first value; the forecast is the last level. statsmodels does it with a fixed α (`optimized=False`) and the first value as the start (`initialization_method="known"`); `.level` is the level after each week, `.fittedvalues` the forecast made the week before.
 
 ```{python}
 # simple exponential smoothing with alpha 0.5, 0.2 and 1
@@ -136,7 +159,7 @@ print("alpha 1 (= naive):", ses1.forecast(1))
 pl.DataFrame({"week": range(1, 9), "contracts": phone, "level": ses5.level, "forecast": ses5.fittedvalues})
 ```
 
-The trend regression (slide 14): b1 = sum (t − t̄)(y − ȳ) / sum (t − t̄)², then b0 = ȳ − b1 × t̄; `smf.ols` gives the same.
+The trend regression (slide 16): b1 = sum (t − t̄)(y − ȳ) / sum (t − t̄)², then b0 = ȳ − b1 × t̄; `smf.ols` gives the same.
 
 ```{python}
 # regression on time: contracts = b0 + b1 * t
@@ -150,7 +173,22 @@ print("weeks 9 and 10:", trend.predict(pl.DataFrame({"t": [9, 10]}).to_pandas())
 trend.params.round(2)
 ```
 
-**The chocolate shop.** Sales per quarter for three years (slide 15). The seasonal effect of a quarter is its average gap to the year mean.
+The same calculation week by week (slide 17): the distances from the means, their products and squares. The sums of the last row give b1 = 84 / 42 = 2; the residuals add up to 0.
+
+```{python}
+# the trend line by hand: deviations, products, squares, fitted values, residuals
+by_hand = (weekly.select("week", "contracts")
+           .with_columns(t_dev=pl.col("week") - pl.col("week").mean(),
+                         y_dev=pl.col("contracts") - pl.col("contracts").mean())
+           .with_columns(product=pl.col("t_dev") * pl.col("y_dev"),
+                         square=pl.col("t_dev") ** 2,
+                         fitted=trend.params["Intercept"] + trend.params["t"] * pl.col("week"))
+           .with_columns(residual=pl.col("contracts") - pl.col("fitted")))
+print(by_hand.sum().with_columns(pl.all().round(2)))
+by_hand
+```
+
+**The chocolate shop.** Sales per quarter for three years (slide 18). The seasonal effect of a quarter is its average gap to the year mean.
 
 ```{python}
 # each quarter's gap to its year mean; the seasonal effect is the average gap
@@ -165,7 +203,7 @@ print(shop.pivot(on="quarter", index="year", values="gap"))
 shop.group_by("quarter").agg(seasonal_effect=pl.col("gap").mean()).sort("quarter")
 ```
 
-Two forecasts for year 4 (slide 16): the seasonal naive repeats year 3; the seasonal regression adds a trend and quarter dummies (Q1 is the baseline), so Q4 of year 4 is 19 + 1 × 16 + 8 = 43.
+Two forecasts for year 4 (slide 19): the seasonal naive repeats year 3; the seasonal regression adds a trend and quarter dummies (Q1 is the baseline), so Q4 of year 4 is 19 + 1 × 16 + 8 = 43.
 
 ```{python}
 # year 4: seasonal naive and seasonal regression
@@ -180,7 +218,7 @@ reg_q.params.round(2)
 
 ## Step 5: how good is a forecast?
 
-The holdout of Part 3 (slides 18–20): fit on weeks 1–5, forecast weeks 6–8 and compare with what happened. The error is actual − forecast.
+The holdout of Part 3 (slides 21–23): fit on weeks 1–5, forecast weeks 6–8 and compare with what happened. The error is actual − forecast.
 
 ```{python}
 # forecasts of weeks 6-8 from weeks 1-5
@@ -197,7 +235,7 @@ print("trend regression, weeks 1-5: b0, b1 =", fit5.params.round(2).to_list())
 hold
 ```
 
-The errors of all six methods, with the naive rows as on slide 19; MAE, RMSE and MAPE are the column means (RMSE the root of the mean squared error), best first as on slide 20.
+The errors of all six methods, with the naive rows as on slide 22; MAE, RMSE and MAPE are the column means (RMSE the root of the mean squared error), best first as on slide 23.
 
 ```{python}
 # errors by hand, then MAE, RMSE and MAPE of all six methods
@@ -226,13 +264,24 @@ print("seasonal regression:", np.abs(q[8:] - reg_q8.predict(quarters[8:]).to_num
 
 How to read it: only the trend regression (MAE 1.20) beats naive (2.67), because the averages lag behind the trend. With a season, naive (8.00) and the mean (6.00) miss Christmas: the benchmark for seasonal data is the seasonal naive (4.00).
 
-## Step 6: decomposition and stationarity
+## Step 6: smoothing, decomposition and stationarity
 
-STL splits the clothing series into trend, season and remainder (slide 23); `robust=True` keeps one-off months from bending the trend.
+A rolling average of 12 months holds every month of the year once, so the December peak cancels out and the trend is left (slide 26). `center=True` centres it: each month gets the average of the 6 months before, the month itself and the 5 after, so July 2009 holds the average month of 2009 (the first 6 and last 5 months stay empty).
+
+```{python}
+# 12-month rolling average, centred: the trend without the season
+from plotnine import facet_wrap, labs
+smooth = df.with_columns(avg12=pl.col("value").rolling_mean(window_size=12, center=True))
+print(smooth.drop_nulls().head(1))
+print(smooth.drop_nulls().tail(1))
+(ggplot(smooth, aes("month")) + geom_line(aes(y="value"), color="#002350")
+ + geom_line(aes(y="avg12"), color="#0096D3", size=1.5) + labs(x="", y="Turnover, AUD m"))
+```
+
+STL is a smarter version of the same idea: it splits the clothing series into trend, season and remainder (slide 27), and lets both change slowly; `robust=True` keeps one-off months from bending the trend.
 
 ```{python}
 # STL: trend, season and remainder
-from plotnine import facet_wrap, labs
 stl = tsa.STL(y, period=12, robust=True).fit()
 print("strength of trend:", round(1 - np.var(stl.resid) / np.var(stl.trend + stl.resid), 2))
 print("strength of season:", round(1 - np.var(stl.resid) / np.var(stl.seasonal + stl.resid), 2))
@@ -255,7 +304,29 @@ print("December 2018 vs November 2018, %:", round(100 * (y[-1] / y[-2] - 1), 1))
 pl.DataFrame({"month": range(1, 13), "index": index.round(3)})
 ```
 
-The ADF test (slide 24) asks whether the series wanders without a fixed mean: a small p (< 0.05) says stationary. Differencing is the fix: the change on last month (`np.diff`) and on the same month last year; SARIMA takes both inside.
+Stationary in plain words (slides 9 and 10): the level and the ups and downs stay the same over time, so any stretch looks like any other. Three simulated series: noise (stationary), a random walk, the running sum of the noise (it wanders off), and the walk's changes, which are the noise again: differencing is the fix.
+
+```{python}
+# stationary or not: noise, a random walk and the walk's changes
+rng = np.random.default_rng(1)
+noise = rng.normal(0, 1, 100)
+walk = noise.cumsum()
+sim = pl.DataFrame({"period": np.arange(1, 101), "noise": noise, "random walk": walk,
+                    "changes of the walk": np.diff(walk, prepend=0)})
+(ggplot(sim.unpivot(index="period", variable_name="series"), aes("period", "value"))
+ + geom_line() + facet_wrap("series", ncol=1))
+```
+
+The real stationary example of slide 9: clothing sales minus the same month a year earlier move up and down around one mean.
+
+```{python}
+# clothing sales minus the same month last year
+yearly = df.with_columns(change=pl.col("value") - pl.col("value").shift(12)).drop_nulls()
+print("months:", yearly.height, " mean change on last year, AUD m:", round(yearly["change"].mean(), 1))
+(ggplot(yearly, aes("month", "change")) + geom_line() + labs(x="", y="Change on last year, AUD m"))
+```
+
+The ADF test (slide 28) asks whether the series wanders without a fixed mean: a small p (< 0.05) says stationary. Differencing is the fix: the change on last month (`np.diff`) and on the same month last year; SARIMA takes both inside.
 
 ```{python}
 # ADF p-values: levels, log and the differences
@@ -270,7 +341,7 @@ print("both changes, log:", round(tsa.adfuller(both)[1], 4), " KPSS p:", tsa.kps
 
 ## Step 7: all fifteen methods on the holdout
 
-Slide 26 compares fifteen methods on 2017–2018. Five more simple ones, each one line, added to the `fc` of Steps 2 and 3:
+Slide 30 compares fifteen methods on 2017–2018. Five more simple ones, each one line, added to the `fc` of Steps 2 and 3:
 
 ```{python}
 # five more simple methods (the seasonal naive is in Step 2)
@@ -323,7 +394,7 @@ How to read it: only three of the other fourteen methods beat the seasonal naive
 
 ## Step 8: the 2019 forecast with 95 % bands
 
-The winner is refitted on all 120 months and forecasts 2019 (slide 27). The 95 % band (`obs_ci_lower`, `obs_ci_upper`) should hold the actual value in 95 of 100 months; SARIMA gives its own band.
+The winner is refitted on all 120 months and forecasts 2019 (slide 31). The 95 % band (`obs_ci_lower`, `obs_ci_upper`) should hold the actual value in 95 of 100 months; SARIMA gives its own band.
 
 ```{python}
 # refit on 2009-2018 and forecast 2019 with 95 % bands
@@ -370,7 +441,7 @@ How to read it: plan with 3,430 AUD m for December 2019 (95 % band 3,178 to 3,70
 
 ## Step 9: are the errors autocorrelated?
 
-A residual is the error of the fitted model on the training months (slide 28). Autocorrelation is their correlation with the month before; Durbin–Watson (DW) is 2 without autocorrelation and far below 2 when errors stick together; Ljung–Box tests the first lags together.
+A residual is the error of the fitted model on the training months (slide 32). Autocorrelation is their correlation with the month before; Durbin–Watson (DW) is 2 without autocorrelation and far below 2 when errors stick together; Ljung–Box tests the first lags together.
 
 ```{python}
 # Durbin-Watson, lag-1 autocorrelation and Ljung-Box of the residuals
@@ -403,7 +474,7 @@ How to read it: the log regression's errors stick together (DW 0.49, lag-1 autoc
 
 ## Appendix: open data for practice
 
-Three open sources for your own forecasting practice (slide 39), none downloaded here; the textbook is Hyndman & Athanasopoulos (2021), *Forecasting: Principles and Practice*, 3rd ed., <https://otexts.com/fpp3> (Python edition <https://otexts.com/fpppy>).
+Three open sources for your own forecasting practice (slide 43), none downloaded here; the textbook is Hyndman & Athanasopoulos (2021), *Forecasting: Principles and Practice*, 3rd ed., <https://otexts.com/fpp3> (Python edition <https://otexts.com/fpppy>).
 
 - **ABS Retail Trade, Australia (8501.0)**: monthly turnover by state and industry, the source of our series; CC BY 4.0, <https://www.abs.gov.au/statistics/industry/retail-and-wholesale-trade/retail-trade-australia>.
 - **Eurostat**: monthly retail trade (`sts_trtu_m`) and nights at tourist accommodation (`tour_occ_nim`) by EU country; free reuse with the source acknowledged.
