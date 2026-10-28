@@ -17,7 +17,7 @@ A mobile operator loses customers in Germany, Austria, Spain and Poland. The ret
 | 2 | **Plenary**: the answers | 5 minutes |
 | 3 | **Posit Assistant**: the same tasks with the assistant; compare its code, numbers and wording with yours (last section) | 10 minutes |
 
-Each task names the steps of the code ladder in `logit_churn.qmd` (slides 28–36). Copy the code of that step, change the one thing the task asks for, run it and read the output. You compute nothing by hand. Deliverable: one slide per pair with the chart of Task 4 and two sentences for the retention manager.
+Each task names the steps of the code ladder in `logit_churn.qmd` (slides 29–37). Copy the code of that step, change the one thing the task asks for, run it and read the output. You compute nothing by hand. Deliverable: one slide per pair with the chart of Task 4 and two sentences for the retention manager.
 
 ## Start here
 

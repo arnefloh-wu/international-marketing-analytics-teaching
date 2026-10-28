@@ -9,7 +9,7 @@ execute:
   warning: false
 ---
 
-The Python part of the deck (slides 28–36), step by step: we start with one line that fits a logistic regression and add one new thing per step. The code is the code on the slides, character for character. Run the chunks in order.
+The Python part of the deck (slides 29–37), step by step: we start with one line that fits a logistic regression and add one new thing per step. The code is the code on the slides, character for character. Run the chunks in order.
 
 The data are simulated for a mobile operator (`data/churn/telco_churn.csv`): 11,000 customers in Germany (DE), Austria (AT), Spain (ES) and Poland (PL). The columns we use:
 
@@ -175,7 +175,7 @@ groups.sort("flagged")
 
 ## Your turn
 
-The in-class exercise is in `churn_exercise.qmd` (slide 40); each task names the step whose code you copy.
+The in-class exercise is in `churn_exercise.qmd` (slide 41); each task names the step whose code you copy.
 
 1. **Fit:** m3 of Step 5: odds ratio, AME and predictions for Austria and Poland (Steps 3, 6, 7)
 2. **Compare:** Step 8 for Austria: coefficient vs AME, next to Spain; two memo sentences
