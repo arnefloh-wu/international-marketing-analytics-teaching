@@ -171,7 +171,7 @@ groups = scored.group_by("flagged").agg(
 groups.sort("flagged")
 ```
 
-884 customers are flagged and 57.9 % of them churn, against 20.5 % of the 10,116 others: the model finds the risky customers. These are the customers the model was fitted on; Part 4 (slides 24 and 25) checks the model on new customers.
+884 customers are flagged and 57.9 % of them churn, against 20.5 % of the 10,116 others: the model finds the risky customers. These are the customers the model was fitted on; Part 4 (slides 24 to 26) checks the model on new customers.
 
 ## Your turn
 
