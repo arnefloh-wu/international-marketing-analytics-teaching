@@ -64,7 +64,7 @@ Tip: pass B first to `proportions_ztest([x_B, x_A], [n_B, n_A])` and `confint_pr
 
 ## Task 3: plan
 
-The next subject-line test expects a click rate of 3.3 % with version A and 3.8 % with version B. How many customers per version does it need for 80 % power at α = 0.05? What is the power with 10,000 customers per version (Step 2)? Write one sentence for the CRM manager on why "just send it to 5,000 each" is risky.
+The next subject-line test expects a click rate of 3.3 % with version A and 3.8 % with version B. How many customers per version does it need for 80 % power at α = 0.05? What is the power with 10,000 customers per version (Steps 2 and 4)? Write one sentence for the CRM manager on why "just send it to 5,000 each" is risky.
 
 Tip: `es = proportion_effectsize(0.038, 0.033)`, then `NormalIndPower().solve_power(es, alpha=0.05, power=0.8)` (round up) and `NormalIndPower().power(es, nobs1=10_000, alpha=0.05)`.
 

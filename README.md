@@ -36,6 +36,7 @@ This repository holds what you need on your laptop for the course: the synthetic
 | `data/logit/sme_exports.csv` | Simulated SME export data (Germany vs Hungary) for the logistic regression deck |
 | `slides/experiments-and-ab-testing_WT26-27.pdf` / `.pptx` | Experiments and A/B testing, with a retention e-mail of a mobile operator in Germany and Spain: why experiments (the counterfactual, the coin flip), designing and analysing an A/B test (variables, chance, sample size and power, checks, moderators, validity), factorial designs and interactions (simple and main effects, regression and ANOVA, the logit vs percentage points), Python, quiz and exercise. The quiz answers follow in class |
 | `sessions/01-foundations/ab_testing.qmd` | Python code of the A/B testing deck: the split check, z-test and CI, power, A/A tests, device as a moderator, the 2 × 2 by hand, regression, ANOVA, logit, the interaction by market |
+| `sessions/01-foundations/ab_testing.py` | The same code as a plain Python script with `# %%` cells: open it in Positron and run it cell by cell |
 | `sessions/01-foundations/ab_exercise.qmd` | In-class exercise of the A/B testing deck: check, test, plan and the 2 × 2 |
 | `data/abtest/email_ab.csv`, `email_factorial.csv` | Simulated e-mail experiments (A/B test of the subject line, 2 × 2 test of first name × discount) for the A/B testing deck |
 | `exercises/` | Coding exercises: put your personal brief, template and data from Canvas here (see `exercises/README.md`) |
