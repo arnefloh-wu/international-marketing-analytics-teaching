@@ -1,6 +1,6 @@
 ---
 title: "In-class exercise: churn across four countries"
-subtitle: "Logistic regression · odds, AMEs, lift and uplift on simulated telco data · International Marketing Analytics"
+subtitle: "Logistic regression · copy a step of the code ladder, change one thing, read the output · International Marketing Analytics"
 format:
   html:
     embed-resources: true
@@ -9,57 +9,40 @@ execute:
   warning: false
 ---
 
-A mobile operator loses customers in Germany, Austria, Spain and Poland. The retention manager asks: **where does the month-to-month contract drive churn most, how good is our churn model, and who should get the retention offer?**
+A mobile operator loses customers in Germany, Austria, Spain and Poland. The retention manager asks: **how much does the month-to-month contract drive churn, does it differ between countries, how good is our churn model, and who should get the retention offer?**
 
 | Step | What | Time |
 |---|---|---|
-| 1 | **Coding exercise** in pairs: Tasks 0 to 4 below with the packages (polars, statsmodels, plotnine, great_tables) | 35 minutes |
+| 1 | **Coding exercise** in pairs: Tasks 1 to 4 below | 35 minutes |
 | 2 | **Plenary**: the answers | 5 minutes |
 | 3 | **Posit Assistant**: the same tasks with the assistant; compare its code, numbers and wording with yours (last section) | 10 minutes |
 
-Use `logit_churn.qmd` as a template: each task names the step or part whose code you can reuse. Deliverable: one slide per pair with a plot and two sentences for the retention manager.
+Each task names the steps of the code ladder in `logit_churn.qmd` (slides 28–36). Copy the code of that step, change the one thing the task asks for, run it and read the output. You compute nothing by hand. Deliverable: one slide per pair with the chart of Task 4 and two sentences for the retention manager.
 
-## The data
+## Start here
 
-`data/churn/telco_churn.csv`: 11,000 simulated customers (DE 4,000, AT 1,500, ES 3,000, PL 2,500) and whether they left within the next 12 months (`churn`). The columns are described at the top of `logit_churn.qmd`; you need `country`, `monthly` (1 = month-to-month contract), `price_increase`, `complaints`, `tenure_months`, `satisfaction`, `retention_offer` (1 = randomly picked for the pilot offer) and `churn`. This file sits in `sessions/01-foundations/`, so it reads the data two folders up (`../../data/...`).
+Run this chunk first: it loads the packages and the data.
 
 ```{python}
 import numpy as np
 import polars as pl
 import statsmodels.formula.api as smf
-from great_tables import GT
-from plotnine import aes, geom_col, geom_hline, ggplot, labs, theme_minimal
+from plotnine import aes, geom_col, ggplot, labs
 
+# load the data; statsmodels needs a pandas table
 churn = pl.read_csv("../../data/churn/telco_churn.csv")
 df = churn.to_pandas()
-
-FORMULA = "churn ~ monthly + price_increase + complaints + np.log(tenure_months)"
-COUNTRIES = ["DE", "AT", "ES", "PL"]
-
-
-def ame(model, data, var, by="country"):
-    """Average change in the churn probability from var = 0 to var = 1, by group (Step 2)."""
-    change = model.predict(data.assign(**{var: 1})) - model.predict(data.assign(**{var: 0}))
-    return change.groupby(data[by]).mean()
 ```
-
-## Task 0: warm-up by hand
-
-The Spanish counts of slide 12 (invented round numbers): 45 of 100 month-to-month customers churn, and 25 of 100 customers on a 24-month contract. With a calculator: the churn probability p, the odds and the log-odds of both groups, then the odds ratio and the difference in log-odds. Germany had an odds ratio of 3.0 and a gap of +15 pp. Where does the contract matter more, Germany or Spain?
-
-Tip: odds = p / (1 − p), log-odds = ln(odds). To check, build the 200 customers as in Part 1 of `logit_churn.qmd` (with 45 and 25 churners) and fit `smf.logit("churn ~ monthly", ...)`.
-
-```{python}
-# your code here (optional check)
-```
-
-*Your answer:*
 
 ## Task 1: fit
 
-Fit the pooled churn logit with country dummies, Germany as reference: `FORMULA + " + C(country, Treatment('DE'))"` (Step 2). How large is the average marginal effect (AME) of the month-to-month contract in each country, in percentage points? Why does it differ although the model has one `monthly` coefficient?
+**Fit:** m3 of Step 5: odds ratio, AME and predictions for Austria and Poland (Steps 3, 6, 7)
 
-Tip: `ame(m, df, "monthly")` gives the AME by country as a share; multiply by 100 for pp.
+Copy Step 5 and run it, so you have `m3`. Then copy Step 3 with `m3` in place of `m1`, and Step 6. Finally copy Step 7 and change the countries to `["AT", "PL"]`.
+
+- What does the odds ratio of `monthly` say? (Odds, not probability.)
+- By how many percentage points does a month-to-month contract raise churn on average?
+- How likely is the customer of Step 7 to churn in Austria, and in Poland?
 
 ```{python}
 # your code here
@@ -69,9 +52,13 @@ Tip: `ame(m, df, "monthly")` gives the AME by country as a share; multiply by 10
 
 ## Task 2: compare
 
-Fit one logit per country with `FORMULA` (Part 3) and put the `monthly` coefficient and its AME next to the pooled AMEs of Task 1. Which country leads on each scale? Write two sentences for a board memo: which number do you report, and why?
+**Compare:** Step 8 for Austria: coefficient vs AME, next to Spain; two memo sentences
 
-Tip: in a loop over `COUNTRIES`, `m_c.params["monthly"]` is the coefficient and `100 * m_c.get_margeff(at="overall", dummy=True).margeff[0]` the AME in pp.
+Copy the Spanish block of Step 8 and run it. Copy it once more and change `"ES"` to `"AT"`, `es` to `at` and `m_es` to `m_at`. Look at the coefficient of `monthly` in `m_at.summary()` and `m_es.summary()`, and at the AME with its interval in the `get_margeff` output.
+
+- Which country leads on the coefficient, and which on the AME?
+- Do the two AME intervals overlap?
+- Two sentences for a board memo: which number do you report, and why?
 
 ```{python}
 # your code here
@@ -81,9 +68,12 @@ Tip: in a loop over `COUNTRIES`, `m_c.params["monthly"]` is the coefficient and 
 
 ## Task 3: evaluate
 
-Split the customers at random, 70 % training and 30 % test (`rng = np.random.default_rng(1)`, `test = rng.random(len(df)) < 0.3`), fit `FORMULA + " + satisfaction + C(country)"` on the training customers and predict the test customers (Step 3). Give the confusion matrix at a threshold of 0.5 (true positives, false positives, missed churners, true negatives) and the top-decile lift (Step 3). Explain each in one sentence for a manager.
+**Evaluate:** Step 9 at a threshold of 0.3 instead of 0.5: who is flagged, who churns?
 
-Tip: `flag = p >= 0.5`, then count `flag & (y == 1)` and so on; `top = np.argsort(-p)[:round(0.1 * len(y))]` and `y[top].mean() / y.mean()`.
+Copy Step 9 (it uses `m3` from Task 1) and change `0.5` to `0.3`.
+
+- How many customers are flagged now, and what share of them churns? Step 9 at 0.5 flagged 884 customers, of whom 57.9 % churn.
+- A missed churner costs more than an offer. Which threshold suits a retention campaign?
 
 ```{python}
 # your code here
@@ -93,31 +83,50 @@ Tip: `flag = p >= 0.5`, then count `flag & (y == 1)` and so on; `top = np.argsor
 
 ## Task 4: target
 
-The retention offer was randomised, so within any group the difference in churn between customers with and without the offer is its effect (Step 4). Group the customers by complaint calls (0, 1, 2, 3+), give the churn rate without and with the offer and the difference in pp, and plot the effect. Who should get the offer, and why not simply the customers with the highest churn risk?
+**Target:** churn with and without the offer by complaint calls; who gets the offer? (code given)
 
-Tip: `pl.when(pl.col("complaints") >= 3).then(pl.lit("3+")).otherwise(pl.col("complaints").cast(pl.String))`, then `group_by` with `pl.col("churn").filter(pl.col("retention_offer") == 0).mean()` and the same for `== 1`.
+The retention offer went to a random half of the customers, so within each group the customers with and without the offer differ only by the offer. Run the two chunks: the churn rate by complaint calls and offer (as in Step 1), then the chart.
+
+- In which groups is churn lower with the offer, and in which not?
+- Who should get the offer, and why not simply the customers with the highest churn risk?
 
 ```{python}
-# your code here
+# complaint calls, with 3 standing for three or more
+calls = pl.col("complaints").clip(upper_bound=3).alias("calls")
+# churn rate by complaint calls and offer (1 = got the offer)
+offer_table = churn.group_by(calls, "retention_offer").agg(
+    pl.col("churn").mean())
+offer_table = offer_table.sort("calls", "retention_offer")
+offer_table
+```
+
+```{python}
+# one bar without and one with the offer per group
+(ggplot(offer_table.to_pandas(),
+        aes("factor(calls)", "churn", fill="factor(retention_offer)"))
+ + geom_col(position="dodge")
+ + labs(x="Complaint calls (3 = three or more)", y="Churn rate", fill="Offer"))
 ```
 
 *Your answer:*
-
-Done early? Task 5 of `logit_churn.qmd` (section "Your turn"): the model of Step 3 trained on Polish customers and used in every country.
 
 ## Then: the same tasks with Posit Assistant
 
 After your own solution and the plenary: ask Posit Assistant and compare.
 
-1. Keep the first code cell run, so Posit Assistant sees `churn`, `df` and `ame()`.
+1. Keep the first code cell run, so Posit Assistant sees `churn` and `df`.
 2. Open the chat: the Posit Assistant icon in the activity bar, or Ctrl/Cmd + Shift + P → *View: Show Posit Assistant*.
-3. Type `@churn_exercise.qmd`, then ask for **one task per prompt**, naming the packages and the output. For example:
+3. Type `@churn_exercise.qmd`, then ask for **one task per prompt**:
 
-   > @churn_exercise.qmd Task 1. Fit the pooled churn logit with Treatment('DE') and give the month-to-month AME per country in percentage points.
+   > @churn_exercise.qmd Task 1. Fit m3 as in Step 5. Explain the odds ratio and the AME of monthly, and predict the customer of Step 7 in AT and PL.
 
-   > Task 4. Estimate the offer effect by complaint calls from the pilot. Who should get the offer, and why not the riskiest customers?
+   > Task 2. Fit the model of Step 8 for Austria. Why do the coefficients and the AMEs rank Austria and Spain differently?
+
+   > Task 3. Run Step 9 with a threshold of 0.3 instead of 0.5. How many are flagged, and how many of them churn? Which threshold suits a campaign?
+
+   > Task 4. Show churn with and without the offer by complaint calls, in a table and a chart. Who should get the offer, and why not the riskiest?
 
 4. It asks before it runs code: **Accept**, **Decline** or reply. Read every edit first. Stay in Normal mode (never `/yolo`).
-5. Compare its code, numbers and wording with yours. Typical slips: a reference country other than Germany, AMEs read as odds ratios, the lift computed on the training data, the riskiest customers picked for the offer.
+5. Compare its code, numbers and wording with yours. Typical slips: a reference country other than Germany, the odds ratio read as "times as likely", coefficients compared across countries, a loop or a helper function where two plain blocks do, the riskiest customers picked for the offer.
 
 *Where did Posit Assistant differ from your solution, and who was right?*
