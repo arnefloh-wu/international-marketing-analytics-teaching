@@ -84,7 +84,7 @@ m2.summary()
 
 `monthly` is now 1.231: with complaint calls held constant, the contract still raises churn. Each complaint call raises it too (0.483).
 
-## Step 5: Add more drivers and the countries
+## Step 5: All drivers and the countries
 
 The other drivers and the countries. `C(country, Treatment('DE'))` makes a dummy for each country, with Germany as the reference (without `Treatment('DE')` statsmodels would take the first country in the alphabet, Austria).
 
