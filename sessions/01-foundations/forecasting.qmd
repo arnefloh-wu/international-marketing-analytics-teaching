@@ -9,9 +9,20 @@ execute:
   warning: false
 ---
 
-The Python part of the deck (slides 35–44), step by step: we start with loading and plotting the data and add one new thing per step, up to the 2019 forecast. The code is the code on the slides, character for character. Run the chunks in order. The short extras A to D after Step 10 repeat a few theory slides in Python; they are optional.
+The Python part of the deck (slides 36–45), step by step: we start with loading and plotting the data and add one new thing per step, up to the 2019 forecast. The code is the code on the slides, character for character. Run the chunks in order. The short extras A to D after Step 10 repeat a few theory slides in Python; they are optional.
 
 The data (`data/forecasting/aus_clothing_retail.csv`): the monthly turnover of clothing, footwear and personal accessory retailing in Australia, April 1982 to April 2019, with two columns, `month` (the first day of the month) and `value` (turnover in AUD million, not seasonally adjusted). Source: ABS, Retail Trade, Australia (8501.0), Table 11; CC BY 4.0.
+
+**Where the data come from and how to get them (slide 26).** Australian Bureau of Statistics (ABS), *Retail Trade, Australia*, cat. no. 8501.0, April 2019 issue, Table 11 "Retail Turnover, State by Industry Subgroup, Original"; © Commonwealth of Australia, licence CC BY 4.0 (free to use and share, name the source).
+
+| | Clothing (this file) | Cafés (the in-class exercise) |
+|---|---|---|
+| ABS series ID | A3349787F | A3349870V |
+| File | `data/forecasting/aus_clothing_retail.csv` | `data/forecasting/aus_cafes_retail.csv` |
+
+- **Course files:** in the repository folder `data/forecasting/`; on GitHub, <https://github.com/arnefloh-wu/international-marketing-analytics-teaching>, folder `data/forecasting`, or Code → Download ZIP for everything.
+- **Original:** <https://www.abs.gov.au/statistics/industry/retail-and-wholesale-trade/retail-trade-australia>, time-series spreadsheets, Table 11; the series ID finds the column. Newer issues have more months.
+- **Textbook:** the same ABS data are `aus_retail` in Hyndman & Athanasopoulos, *Forecasting: Principles and Practice* (otexts.com/fpp3), so you can compare with the book.
 
 ## Step 1: Load and look
 
@@ -78,11 +89,11 @@ mae_naive = np.mean(np.abs(test - naive))
 print(mae_snaive, mae_naive)
 ```
 
-The seasonal naive misses by 67.2 AUD m a month on average, naive by 1,277.5: the December trap. On seasonal data the seasonal naive is the benchmark to beat (slide 30).
+The seasonal naive misses by 67.2 AUD m a month on average, naive by 1,277.5: the December trap. On seasonal data the seasonal naive is the benchmark to beat (slide 31).
 
 ## Step 5: Smooth: a rolling average
 
-A rolling average of 12 months holds every month of the year once, so the December peak cancels out and the trend is left (slide 26). `center=True` gives each month the average of the 12 months around it.
+A rolling average of 12 months holds every month of the year once, so the December peak cancels out and the trend is left (slide 27). `center=True` gives each month the average of the 12 months around it.
 
 ```{python}
 # 12-month rolling average, centred: the trend
@@ -99,7 +110,7 @@ The trend runs from 1,628.8 in July 2009 (the average month of 2009) to 2,089.8 
 
 ## Step 6: Exponential smoothing
 
-Holt-Winters smooths a level, a trend and a season (slide 29). `seasonal="mul"` lets the December peak grow with the level; `seasonal_periods=12` says the data are monthly.
+Holt-Winters smooths a level, a trend and a season (slide 30). `seasonal="mul"` lets the December peak grow with the level; `seasonal_periods=12` says the data are monthly.
 
 ```{python}
 import statsmodels.tsa.api as tsa
@@ -139,7 +150,7 @@ MAE 54.5: the first method that beats the seasonal naive. `reg.summary()` shows 
 
 ## Step 8: SARIMA
 
-SARIMA works on log sales: it takes the change on last month and on the same month last year, and models how much of a surprise carries on (slide 29).
+SARIMA works on log sales: it takes the change on last month and on the same month last year, and models how much of a surprise carries on (slide 30).
 
 ```{python}
 # SARIMA on log sales: a change on last month
@@ -165,7 +176,7 @@ pl.DataFrame({
     "MAE": [mae_snaive, mae_hw, mae_reg, mae_sar]})
 ```
 
-The regression wins (54.5); the seasonal naive (67.2) comes second, ahead of SARIMA (94.9) and Holt-Winters (96.6). Slide 30 shows the same ranking with eleven methods.
+The regression wins (54.5); the seasonal naive (67.2) comes second, ahead of SARIMA (94.9) and Holt-Winters (96.6). Slide 31 shows the same ranking with eleven methods.
 
 ## Step 10: Forecast 2019
 
@@ -185,7 +196,7 @@ band = reg_all.get_prediction(new).summary_frame()
 np.exp(band[["mean", "obs_ci_lower", "obs_ci_upper"]])
 ```
 
-Plan December 2019 (row 11) with 3,430 AUD m; the band runs from 3,178 to 3,702 (slide 31). For stock, order towards the upper part of the band if a stock-out is expensive.
+Plan December 2019 (row 11) with 3,430 AUD m; the band runs from 3,178 to 3,702 (slide 32). For stock, order towards the upper part of the band if a stock-out is expensive.
 
 ## Extra A: the two shops by hand
 
@@ -250,7 +261,7 @@ chart + facet_wrap("series", ncol=1)
 
 ## Extra C: decomposition and the ADF test
 
-Optional (slides 27 and 28). The seasonal index says how much a month sells against an average month; STL splits the series into trend, season and remainder.
+Optional (slides 28 and 29). The seasonal index says how much a month sells against an average month; STL splits the series into trend, season and remainder.
 
 ```{python}
 # the seasonal index of each month, January to December
@@ -275,7 +286,7 @@ Sales in levels wander (p 0.99); both changes pass at 5 %.
 
 ## Extra D: errors that stick together
 
-Optional (slides 31 and 32). The errors of the regression of Step 7 on the training months run in long waves: Durbin–Watson is 2 without autocorrelation and far below 2 when the errors stick together. SARIMA leaves almost none.
+Optional (slides 32 and 33). The errors of the regression of Step 7 on the training months run in long waves: Durbin–Watson is 2 without autocorrelation and far below 2 when the errors stick together. SARIMA leaves almost none.
 
 ```{python}
 # Durbin-Watson and lag-1 autocorrelation of the errors
@@ -300,11 +311,11 @@ December 2019: 3,509 AUD m with a band from 3,227 to 3,816. The band is 209 AUD 
 
 ## Your turn
 
-The in-class exercise is in `forecasting_exercise.qmd` (slide 48): café sales instead of clothing; each task names the steps and extras whose code you copy.
+The in-class exercise is in `forecasting_exercise.qmd` (slide 49): café sales instead of clothing; each task names the steps and extras whose code you copy.
 
 ## Appendix: open data for practice
 
-Three open sources for your own forecasting practice (slide 50), none downloaded here; the textbook is Hyndman & Athanasopoulos (2021), *Forecasting: Principles and Practice*, 3rd ed., <https://otexts.com/fpp3> (Python edition <https://otexts.com/fpppy>).
+Three open sources for your own forecasting practice (slide 51), none downloaded here; the textbook is Hyndman & Athanasopoulos (2021), *Forecasting: Principles and Practice*, 3rd ed., <https://otexts.com/fpp3> (Python edition <https://otexts.com/fpppy>).
 
 - **ABS Retail Trade, Australia (8501.0)**: monthly turnover by state and industry, the source of our series; CC BY 4.0, <https://www.abs.gov.au/statistics/industry/retail-and-wholesale-trade/retail-trade-australia>.
 - **Eurostat**: monthly retail trade (`sts_trtu_m`) and nights at tourist accommodation (`tour_occ_nim`) by EU country; free reuse with the source acknowledged.

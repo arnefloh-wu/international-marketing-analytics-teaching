@@ -23,6 +23,8 @@ Use `forecasting.qmd` as a template: each task names the step whose code you can
 
 `data/forecasting/aus_cafes_retail.csv`: the monthly turnover of cafés, restaurants and takeaway food services in Australia, in AUD million (AUD m), not seasonally adjusted, April 1982 to April 2019 (source: ABS, Retail Trade, Australia, cat. no. 8501.0, Table 11; CC BY 4.0). Two columns: `month` (the first day of the month) and `value` (turnover, AUD m). As in the deck, we use January 2009 to December 2018 (120 months), keep 2017–2018 back as the holdout and use January–April 2019, the last four months in the file, as a check of the 2019 forecast. This file sits in `sessions/01-foundations/`, so it reads the data two folders up (`../../data/...`). Run the first cell as it is.
 
+Where to get it: the file is in the course repository (`data/forecasting/`, also on GitHub: <https://github.com/arnefloh-wu/international-marketing-analytics-teaching>). The original is ABS series A3349870V in Table 11 of *Retail Trade, Australia* (cat. no. 8501.0) on <https://www.abs.gov.au/statistics/industry/retail-and-wholesale-trade/retail-trade-australia>; slide 26 and the top of `forecasting.qmd` give the details.
+
 ```{python}
 import warnings
 
