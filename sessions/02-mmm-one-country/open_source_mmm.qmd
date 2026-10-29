@@ -1,0 +1,420 @@
+---
+title: "Open-source marketing mix modelling: a sports web shop in Austria"
+subtitle: "The code ladder of the deck 'Open-source marketing mix modelling' · International Marketing Analytics"
+format:
+  html:
+    embed-resources: true
+    toc: true
+execute:
+  warning: false
+---
+
+The Python part of the deck (slides 31–39), step by step: we start with loading the data and add one new thing per step, from a first regression to a Bayesian marketing mix model (MMM). The code is the code on the slides, character for character. Run the chunks in order. Steps 8 and 9 need PyMC-Marketing (in the course environment, version 0.19.2; the fit takes about 25 s, about 75 s the first time); the same code runs on PyMC-Marketing 1.3.0 (Python 3.12). The extras A to D after Step 9 repeat other slides in Python; they are optional.
+
+**The data (`data/mmm_open/sports_weekly.csv`).** Real, anonymised weekly data of one sports brand ("Individual Sports", home market Germany) from the Conjura MMM dataset: Anderson, A. (2024), *Multi-Region Marketing Mix Modelling (MMM) Dataset for Several eCommerce Brands* (v3), figshare, doi 10.6084/m9.figshare.25314841.v3, CC BY 4.0 (as stated by the GitHub copy we used). The course summed the daily rows to Monday-to-Sunday weeks with `data/get_mmm_open_data.py`.
+
+| Column | Meaning |
+|---|---|
+| `country`, `currency` | DE, AT, CH; EUR or CHF (the money columns are in thousands: k EUR) |
+| `week` | the Monday of the week |
+| `sales` | value of the goods ordered in the web shop before discounts |
+| `orders` | number of web purchases |
+| `google` | spend on all Google ads (search, shopping, Performance Max, display, video) |
+| `meta` | spend on Facebook, Instagram and other Meta ads |
+
+- **Austria**, our model: 134 weeks, 26 Jul 2021 to 18 Feb 2024, k EUR. Germany (134 weeks, EUR) and Switzerland (81 weeks, CHF) are in the same file.
+- **How to get it:** the file is in the repository folder `data/mmm_open/` (on GitHub: Code → Download ZIP). The original daily file is on figshare; the script names the exact copy it downloads and rebuilds the weekly file.
+- **A warning (slide 27):** Google spend follows demand (shopping budgets grow with searches, Black Friday), so a model may credit Google with sales it only caught.
+- `data/mmm_open/hand_example.csv` holds the invented coffee brand of Parts 1 and 2 (Extra A).
+
+```{python}
+# setup: hide warnings; numpy for the extras
+import warnings
+warnings.filterwarnings("ignore")
+import numpy as np
+```
+
+## Step 1: Load and look
+
+We read the file with polars and keep the Austrian rows. This file sits in `sessions/02-mmm-one-country/`, so the path goes two folders up; `try_parse_dates=True` turns the week column into dates.
+
+```{python}
+import polars as pl
+
+# load the weekly data and keep Austria
+file = "../../data/mmm_open/sports_weekly.csv"
+df = pl.read_csv(file, try_parse_dates=True)
+at = df.filter(pl.col("country") == "AT")
+print(at.head())
+
+# total sales and spend, k EUR
+at.select(pl.col("sales", "google", "meta").sum())
+```
+
+The shop sold goods for 3,180 k EUR and spent 491 k EUR on Google and 70 k EUR on Meta, in 134 weeks:
+
+```{python}
+# number of weeks, first and last Monday
+print(at.height, at["week"].min(), at["week"].max())
+```
+
+## Step 2: A first regression
+
+An ordinary regression of weekly sales on the spend of both channels: `smf.ols` takes a formula and the data as a pandas frame.
+
+```{python}
+import statsmodels.formula.api as smf
+
+# sales on the spend of both channels
+m1 = smf.ols("sales ~ google + meta",
+             data=at.to_pandas()).fit()
+m1.params
+```
+
+Each k EUR on Google goes with 3.93 k EUR of sales, each on Meta with 8.10; nothing controls for the trend yet.
+
+## Step 3: Add the trend
+
+Sales and spend both grew over the period. `week_no` (1 to 134) gives the trend its own coefficient; it is a control.
+
+```{python}
+# week_no counts the weeks 1 to 134: the trend
+at = at.with_columns(
+    week_no=pl.int_range(1, pl.len() + 1))
+m2 = smf.ols("sales ~ google + meta + week_no",
+             data=at.to_pandas()).fit()
+m2.params
+```
+
+Google falls to 3.60, Meta to 6.93: the trend (0.09 k EUR more sales each week) took some credit from the channels. The R² of Steps 2 and 3:
+
+```{python}
+# share of the weekly ups and downs explained
+print(m1.rsquared, m2.rsquared)
+```
+
+## Step 4: Adstock in one line
+
+Carryover: this week's spend keeps working next week. `lfilter([1], [1, -0.5], ...)` computes adstock = this week's spend + 0.5 × last week's adstock (slide 8).
+
+```{python}
+from scipy.signal import lfilter
+
+# adstock: this week's spend + 0.5 x last stock
+at = at.with_columns(
+    meta_ad=lfilter([1], [1, -0.5], at["meta"]))
+at.select("week", "meta", "meta_ad").head()
+```
+
+Week 2 by hand: 0.273 + 0.5 × 0.389 = 0.4675, as in the table. The decay of 0.5 is our assumption; Step 9 lets the data decide.
+
+## Step 5: Regression with carryover
+
+The same regression, with Meta's adstock instead of its spend.
+
+```{python}
+# Meta with its carryover, Google without
+m3 = smf.ols("sales ~ google + meta_ad + week_no",
+             data=at.to_pandas()).fit()
+m3.params
+```
+
+Google 3.56 and Meta 3.93 k EUR of sales per k EUR of adstock (R² 0.60, printed in Step 7).
+
+## Step 6: Contributions and ROI
+
+A channel's contribution is its coefficient times its column total; the ROI is the contribution divided by the spend.
+
+```{python}
+# contribution = coefficient x column total
+b = m3.params
+c_google = b["google"] * at["google"].sum()
+c_meta = b["meta_ad"] * at["meta_ad"].sum()
+print(c_google, c_meta)
+
+# ROI = contribution / spend
+print(c_google / at["google"].sum())
+print(c_meta / at["meta"].sum())
+```
+
+Google brought 1,746 and Meta 543 k EUR of sales; ROI 3.56 and 7.78 EUR of sales per euro (Meta's euros work about twice through carryover). The rest is the baseline:
+
+```{python}
+# baseline = sales - contributions, and its share
+sales = at["sales"].sum()
+print(sales - c_google - c_meta)
+print((sales - c_google - c_meta) / sales)
+```
+
+The baseline is 891 k EUR, 28 % of sales.
+
+## Step 7: Saturation in one line
+
+Saturation: each extra euro buys less. `google / (google + 20)` is a curve with its half-saturation point at 20 k EUR a week.
+
+```{python}
+# saturation: half-saturation at 20 k EUR a week
+at = at.with_columns(
+    google_sat=at["google"] / (at["google"] + 20))
+m4 = smf.ols(
+    "sales ~ google_sat + meta_ad + week_no",
+    data=at.to_pandas()).fit()
+print(m3.rsquared, m4.rsquared)
+
+# the Google ROI of the curved model
+b4 = m4.params
+c_sat = b4["google_sat"] * at["google_sat"].sum()
+print(c_sat / at["google"].sum())
+```
+
+The same fit (R² 0.60 both), another answer: Google's ROI is 4.79 instead of 3.56, and the baseline shrinks:
+
+```{python}
+# the baseline share of the curved model
+c_meta4 = b4["meta_ad"] * at["meta_ad"].sum()
+print((sales - c_sat - c_meta4) / sales)
+```
+
+Only 9 % of sales are left for the baseline (28 % in Step 6). The data cannot choose the curve; priors and experiments must.
+
+## Step 8: PyMC-Marketing
+
+Six lines define a Bayesian MMM: geometric adstock (up to 6 weeks), logistic saturation, the trend as a control and a yearly season; one call fits it. PyMC-Marketing calls the decay `alpha` and the ROI "ROAS".
+
+```{python}
+from pymc_marketing.mmm import (
+    GeometricAdstock, LogisticSaturation)
+from pymc_marketing.mmm.multidimensional import MMM
+
+# the Bayesian MMM: adstock, then saturation
+mmm = MMM(date_column="week", target_column="sales",
+          channel_columns=["google", "meta"],
+          control_columns=["week_no"],
+          adstock=GeometricAdstock(l_max=6),
+          saturation=LogisticSaturation(),
+          yearly_seasonality=2)
+X = at.select("week", "google", "meta", "week_no")
+mmm.fit(X.to_pandas(), at["sales"].to_pandas(),
+        draws=500, tune=500, chains=2,
+        random_seed=1, progressbar=False)
+```
+
+The result lists what the fit stored: the posterior draws, the sampler statistics and the data. Two chains of 500 draws are a quick fit for class; real work uses four chains and more draws. A divergence is a warning sign of the sampler; we want none:
+
+```{python}
+# number of divergent draws
+print("divergences:", int(mmm.idata.sample_stats.diverging.sum()))
+```
+
+## Step 9: Check and read
+
+First the check, then the answer. `az.summary` shows the posterior of each decay with its 94 % interval (`hdi_3%` to `hdi_97%`) and R-hat; `mmm.summary.roas` gives the ROI per channel.
+
+```{python}
+import arviz as az
+
+# the decay of each channel, with R-hat
+print(az.summary(mmm.idata,
+                 var_names=["adstock_alpha"]))
+
+# ROI per channel: mean and 94 % interval
+roi = mmm.summary.roas(frequency="all_time")
+roi
+```
+
+R-hat 1.00: the chains agree. The decay is 0.05 for Google and 0.11 for Meta, far below our 0.5 of Step 4. ROI: Google 3.38 (2.33 to 4.65), Meta 9.45 (6.66 to 12.18). The contributions (slide 28):
+
+```{python}
+# contributions, k EUR, and shares of sales
+contrib = mmm.summary.contributions(frequency="all_time")
+print(contrib[["channel", "mean"]])
+print(contrib["mean"] / sales)
+print(1 - contrib["mean"].sum() / sales)
+```
+
+Google 52 % and Meta 21 % of sales; the rest (baseline, trend, season) is 27 %. This is what the model says, not a proven effect: Google spend follows demand.
+
+## Extra A: the coffee brand by hand, in Python
+
+Optional (slides 4 and 7–14). TV adstock with the line of Step 4, and the model of slide 7 next to the sales:
+
+```{python}
+# the coffee brand: TV adstock with decay 0.5
+hand = pl.read_csv("../../data/mmm_open/hand_example.csv")
+hand = hand.with_columns(
+    tv_ad=lfilter([1], [1, -0.5], hand["tv"]))
+# the model: 100 + 1 x TV adstock + 3 x online
+hand.with_columns(
+    model=100 + 1 * hand["tv_ad"] + 3 * hand["online"])
+```
+
+The adstock runs 0, 0, 16, 16, 8, 4, 2, 1, 0.5, 0.25; the model gives the sales of every week. Contributions and ROI as in Step 6:
+
+```{python}
+# contributions over the ten weeks, k EUR
+c_tv = 1 * hand["tv_ad"].sum()
+c_online = 3 * hand["online"].sum()
+print(100 * 10, c_tv, c_online, hand["sales"].sum())
+# ROI = contribution / spend; TV without carryover
+print(c_tv / hand["tv"].sum(), c_online / hand["online"].sum())
+print(1 * hand["tv"].sum() / hand["tv"].sum())
+```
+
+Baseline 1,000 + TV 47.75 + online 150 = 1,197.75. ROI TV 1.99, online 3.00; without carryover TV shows only 24 / 24 = 1.00. The online saturation curve of slide 9:
+
+```{python}
+# online saturation: effect = 30 x spend / (spend + 5)
+sat = pl.DataFrame({"spend": [0.0, 2.5, 5.0, 10.0, 15.0, 20.0]})
+sat.with_columns(
+    effect=30 * pl.col("spend") / (pl.col("spend") + 5))
+```
+
+The budget question (slide 14), 5 k EUR more a week: online goes from 5 to 10, 20 − 15 = 5 more sales (ROI 1.00); on TV each euro works twice, 1 × 5 × 2 = 10 (ROI 2.00).
+
+## Extra B: response curves and the next euro
+
+Optional (slides 28–29). For each posterior draw, the weekly sales at a constant weekly spend s are T × beta × (1 − e^−x) / (1 + e^−x) with x = lam × s / scale (T and scale: the largest weekly sales and spend); `np.tanh(x / 2)` is the same fraction in short. Google at its mean spend, at 10 % more and at 0.5 k EUR less; the ROI of the next euro with the 3rd and 97th percentiles of the draws:
+
+```{python}
+# Google: the posterior draws of its curve
+post = mmm.idata.posterior
+const = mmm.idata.constant_data
+T = const["target_scale"].item()
+sc_g = const["channel_scale"].sel(channel="google").item()
+beta_g = post["saturation_beta"].sel(channel="google").values.ravel()
+lam_g = post["saturation_lam"].sel(channel="google").values.ravel()
+# weekly sales at mean spend g, at 1.1 g and at g - 0.5
+g = at["google"].mean()
+now_g = T * beta_g * np.tanh(lam_g * g / sc_g / 2)
+up_g = T * beta_g * np.tanh(lam_g * 1.1 * g / sc_g / 2)
+down_g = T * beta_g * np.tanh(lam_g * (g - 0.5) / sc_g / 2)
+marg_g = (up_g - now_g) / (0.1 * g)
+print(g, now_g.mean(), now_g.mean() / g)
+print(marg_g.mean(), np.percentile(marg_g, [3, 97]))
+```
+
+At 3.66 k EUR a week Google brings 12.83 k EUR (average ROI 3.50); the next euro brings 3.28 (2.32 to 4.36). The same lines for Meta (with 0.5 k EUR more), then the shift of 0.5 k EUR a week from Google to Meta:
+
+```{python}
+# Meta: the same lines
+sc_m = const["channel_scale"].sel(channel="meta").item()
+beta_m = post["saturation_beta"].sel(channel="meta").values.ravel()
+lam_m = post["saturation_lam"].sel(channel="meta").values.ravel()
+m = at["meta"].mean()
+now_m = T * beta_m * np.tanh(lam_m * m / sc_m / 2)
+up_m = T * beta_m * np.tanh(lam_m * 1.1 * m / sc_m / 2)
+plus_m = T * beta_m * np.tanh(lam_m * (m + 0.5) / sc_m / 2)
+marg_m = (up_m - now_m) / (0.1 * m)
+print(m, now_m.mean(), marg_m.mean(), np.percentile(marg_m, [3, 97]))
+
+# move 0.5 k EUR a week from Google to Meta, per draw
+shift = (plus_m - now_m) - (now_g - down_g)
+print(shift.mean(), np.percentile(shift, [3, 97]))
+print(52 * shift.mean(), (shift > 0).mean())
+```
+
+Meta: 0.52 k EUR a week bring 5.17; the next euro 9.77 (6.92 to 13.07). The shift gains 3.11 k EUR a week (1.56 to 4.87), 162 k EUR a year, in 100 % of the draws. But Meta's curve rests on low spend and the model cannot see demand-led spend: test before moving the budget.
+
+## Extra C: another country, the same code
+
+Optional (slide 22, assignment Task 2). Germany with the lines of Steps 3 to 6, "AT" replaced by "DE"; new names keep the Austrian objects intact.
+
+```{python}
+# Germany: trend, adstock and the regression of Step 5
+de = df.filter(pl.col("country") == "DE")
+de = de.with_columns(
+    week_no=pl.int_range(1, pl.len() + 1))
+de = de.with_columns(
+    meta_ad=lfilter([1], [1, -0.5], de["meta"]))
+m3_de = smf.ols("sales ~ google + meta_ad + week_no",
+                data=de.to_pandas()).fit()
+# ROI and baseline share, as in Step 6
+c_google_de = m3_de.params["google"] * de["google"].sum()
+c_meta_de = m3_de.params["meta_ad"] * de["meta_ad"].sum()
+print(c_google_de / de["google"].sum(), c_meta_de / de["meta"].sum())
+sales_de = de["sales"].sum()
+print((sales_de - c_google_de - c_meta_de) / sales_de)
+de.select(pl.corr("sales", "google"))
+```
+
+OLS: ROI Google 3.93, Meta 8.90, baseline 3.1 % of sales; sales and Google spend move together (correlation 0.90). The MMM of Step 8 with the same settings:
+
+```{python}
+# the MMM of Step 8 for Germany
+mmm_de = MMM(date_column="week", target_column="sales",
+             channel_columns=["google", "meta"],
+             control_columns=["week_no"],
+             adstock=GeometricAdstock(l_max=6),
+             saturation=LogisticSaturation(),
+             yearly_seasonality=2)
+X_de = de.select("week", "google", "meta", "week_no")
+mmm_de.fit(X_de.to_pandas(), de["sales"].to_pandas(),
+           draws=500, tune=500, chains=2,
+           random_seed=1, progressbar=False)
+# ROI, and contributions as shares of sales
+print(mmm_de.summary.roas(frequency="all_time"))
+contrib_de = mmm_de.summary.contributions(frequency="all_time")
+print(contrib_de["mean"] / sales_de)
+print(1 - contrib_de["mean"].sum() / sales_de)
+```
+
+ROI Google 3.84 (3.26 to 4.45), Meta 8.99 (6.27 to 11.37); Google 78.0 % and Meta 17.2 % of sales, the rest only 4.8 %. A baseline of 5 % is not plausible for a brand with direct and organic traffic: Google spend follows demand. Task 2 asks what you would test. (Run interactively, the sampler also warns that some R-hat values are above 1.01 here: use more draws before you trust these numbers.)
+
+## Extra D: Meridian and Robyn, the same model in their words (not run)
+
+Optional (slides 19 and 20): two short snippets from the tools' own examples, **not run here** (neither tool is in the course environment). Google Meridian needs geo-level data with the population of each geo and runs best on a GPU:
+
+```python
+from meridian.data import (
+    data_frame_input_data_builder as db)
+from meridian.model import model, spec
+builder = db.DataFrameInputDataBuilder(
+    kpi_type="non_revenue",
+    default_kpi_column="conversions")
+builder = (builder.with_kpi(df)
+           .with_population(df)
+           .with_media(df,
+               media_cols=["Channel0_impression"],
+               media_spend_cols=["Channel0_spend"],
+               media_channels=["Channel0"]))
+mmm = model.Meridian(input_data=builder.build(),
+                     model_spec=spec.ModelSpec())
+mmm.sample_posterior(n_chains=10, n_adapt=1000,
+                     n_burnin=500, n_keep=1000)
+```
+
+Source: Meridian Getting Started notebook, github.com/google/meridian (commit ef585b5); shortened; not run here.
+
+Meta's Robyn is an R package that also needs the Python library Nevergrad for its search; `hyperparameters` (the ranges of adstock and saturation per channel) is defined earlier in the demo:
+
+```r
+library(Robyn)
+InputCollect <- robyn_inputs(
+  dt_input = dt_simulated_weekly,
+  dt_holidays = dt_prophet_holidays,
+  date_var = "DATE", dep_var = "revenue",
+  dep_var_type = "revenue",
+  prophet_vars = c("trend", "season", "holiday"),
+  prophet_country = "DE",
+  paid_media_spends = c("tv_S", "search_S"),
+  adstock = "geometric",
+  hyperparameters = hyperparameters)
+OutputModels <- robyn_run(
+  InputCollect = InputCollect,
+  iterations = 2000, trials = 5)
+```
+
+Source: Robyn demo.R, github.com/facebookexperimental/Robyn (commit aab4226); shortened; not run here.
+
+## Your turn
+
+The in-class assignment is in `mmm_assignment.qmd` (slides 43–44): four tasks in groups, no coding – move a budget along response curves, read the German model critically (Extra C), grade a vendor claim, choose a tool.
+
+## Appendix: open data for MMM projects
+
+Four open sources for your own practice (slide 45); the licence decides what you may do.
+
+- **Conjura MMM dataset** (real): doi.org/10.6084/m9.figshare.25314841.v3; copy used: github.com/jpcca/marketing-mix-modelling, data folder, commit fc737aa; CC BY 4.0.
+- **Meridian simulated geo data** (simulated): github.com/google/meridian, meridian/data/simulated_data.
+- **PyMC-Marketing example data** (simulated): github.com/pymc-labs/pymc-marketing, data folder.
+- **Robyn demo data** (simulated): `dt_simulated_weekly` in the Robyn package.

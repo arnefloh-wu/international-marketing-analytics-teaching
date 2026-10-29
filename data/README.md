@@ -54,3 +54,8 @@ The one small example of the statistics refresher, not part of Alpenglow: a choc
 
 - `Video_Games_Sales.csv`: sales of 16 719 video games in North America, Europe, Japan and the rest of the world (millions of units), with genre, platform, critic and user scores. Public dataset from Kaggle ("Video Game Sales with Ratings", based on VGChartz and Metacritic).
 - `chocolate_dataset.csv` (and the original `.xlsx`): real weekly scanner data, 68 weeks. Unit sales of brand 1; prices (`price1` to `price4`), feature ads (`feature1` to `feature4`), displays (`display1` to `display4`) and feature-and-display (`fand1`, `fand3`, `fand4`; shares of stores, 0 to 1) of four chocolate brands; `temp` (°C), `december` and `easter` dummies; `week` 1 to 68. Used in Lab 1 (exercise 4), the regression slides, `sessions/01-foundations/regression_chocolate.qmd` and coding exercise 1. Read the CSV with `pl.read_csv`; reading the .xlsx needs an extra package.
+
+## `mmm_open/`: data for the deck "Open-source marketing mix modelling"
+
+- `sports_weekly.csv`: real, anonymised weekly data of one sports brand from the Conjura multi-region MMM dataset: Germany and Austria 134 weeks each (2021-07-26 to 2024-02-18, EUR), Switzerland 81 weeks (CHF). Columns `country`, `currency`, `week`, `sales`, `orders`, `google`, `meta` (money in thousands). Source: Anderson, A. (2024), Multi-Region Marketing Mix Modelling (MMM) Dataset for Several eCommerce Brands, v3, figshare, https://doi.org/10.6084/m9.figshare.25314841.v3, CC BY 4.0. Daily rows summed to weeks by the course.
+- `hand_example.csv`: invented round numbers for the calculations by hand (a coffee brand, ten weeks, TV and online spend, sales in k EUR).
